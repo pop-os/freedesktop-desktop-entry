@@ -30,7 +30,7 @@ fn main() {
         "Popsicle",
         APPID,
         DesktopType::Application(
-            Application::new("System", exec)
+            Application::new(&["System", "GTK"], exec)
                 .keywords(&["usb", "flash" ,"drive", "image"])
                 .startup_notify(),
         ),

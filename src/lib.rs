@@ -26,7 +26,7 @@
 //!         "Popsicle",
 //!         APPID,
 //!         DesktopType::Application(
-//!             Application::new("System", exec)
+//!             Application::new(&["System", "GTK"], exec)
 //!                 .keywords(&["usb", "flash" ,"drive", "image"])
 //!                 .startup_notify(),
 //!         ),
@@ -39,7 +39,7 @@
 //! ```
 
 pub struct Application<'a> {
-    pub categories: &'a str,
+    pub categories: &'a [&'a str],
     pub exec: &'a str,
     pub keywords: &'a [&'a str],
     pub mime_types: &'a [&'a str],
@@ -51,7 +51,7 @@ pub struct Application<'a> {
 }
 
 impl<'a> Application<'a> {
-    pub fn new(categories: &'a str, exec: &'a str) -> Self {
+    pub fn new(categories: &'a [&'a str], exec: &'a str) -> Self {
         Application {
             categories,
             exec,
@@ -152,7 +152,12 @@ markup::define! {
         }
 
         @if let DesktopType::Application(app) = (kind) {
-            "Categories=" {markup::raw(app.categories)} "\n"
+            "Categories="
+            {markup::raw(app.categories[0])}
+            @for category in app.categories[1..].iter() {
+                ";" {markup::raw(category)}
+            }
+            "\n"
 
             @if !app.keywords.is_empty() {
                 "Keywords=" { '\"' }
