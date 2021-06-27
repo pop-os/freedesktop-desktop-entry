@@ -24,7 +24,7 @@ impl Iterator for Iter {
                 Some(dir) => dir,
                 None => {
                     while let Some((path_src, path)) = self.directories_to_walk.pop() {
-                        match fs::read_dir(path) {
+                        match fs::read_dir(&path) {
                             Ok(directory) => {
                                 self.actively_walking = Some((path_src, directory));
                                 continue 'outer;

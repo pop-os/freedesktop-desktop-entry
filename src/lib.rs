@@ -154,23 +154,23 @@ pub fn default_paths() -> Vec<(PathSource, PathBuf)> {
     let home_dir = dirs::home_dir().unwrap();
 
     vec![
-        (PathSource::System, PathBuf::from("/usr/share/applications")),
+        (PathSource::LocalDesktop, home_dir.join("Desktop")),
         (
-            PathSource::SystemFlatpak,
-            PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+            PathSource::LocalFlatpak,
+            home_dir.join(".local/share/flatpak/exports/share/applications"),
+        ),
+        (
+            PathSource::Local,
+            home_dir.join(".local/share/applications"),
         ),
         (
             PathSource::SystemSnap,
             PathBuf::from("/var/lib/snapd/desktop/applications"),
         ),
         (
-            PathSource::Local,
-            home_dir.join(".local/share/applications"),
+            PathSource::SystemFlatpak,
+            PathBuf::from("/var/lib/flatpak/exports/share/applications"),
         ),
-        (PathSource::LocalDesktop, home_dir.join("Desktop")),
-        (
-            PathSource::LocalFlatpak,
-            PathBuf::from(".local/share/flatpak/exports/share/applications"),
-        ),
+        (PathSource::System, PathBuf::from("/usr/share/applications")),
     ]
 }
