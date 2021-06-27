@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 pub type MapStr = Cow<'static, str>;
 pub type KeyMap = BTreeMap<MapStr, (MapStr, BTreeMap<MapStr, MapStr>)>;
 
+#[derive(Debug, Clone)]
 pub struct DesktopEntryBuf {
     pub appid: MapStr,
     pub groups: BTreeMap<MapStr, KeyMap>,

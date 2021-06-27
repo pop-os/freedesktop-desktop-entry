@@ -140,6 +140,7 @@ impl<'a> Display for DesktopEntry<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PathSource {
     Local,
     LocalDesktop,
@@ -154,11 +155,22 @@ pub fn default_paths() -> Vec<(PathSource, PathBuf)> {
 
     vec![
         (PathSource::System, PathBuf::from("/usr/share/applications")),
-        (PathSource::SystemFlatpak, PathBuf::from("/var/lib/flatpak/exports/share/applications")),
-        (PathSource::SystemSnap, PathBuf::from("/var/lib/snapd/desktop/applications")),
-        (PathSource::Local, home_dir.join(".local/share/applications")),
+        (
+            PathSource::SystemFlatpak,
+            PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+        ),
+        (
+            PathSource::SystemSnap,
+            PathBuf::from("/var/lib/snapd/desktop/applications"),
+        ),
+        (
+            PathSource::Local,
+            home_dir.join(".local/share/applications"),
+        ),
         (PathSource::LocalDesktop, home_dir.join("Desktop")),
-        (PathSource::LocalFlatpak, PathBuf::from(".local/share/flatpak/exports/share/applications"))
-
+        (
+            PathSource::LocalFlatpak,
+            PathBuf::from(".local/share/flatpak/exports/share/applications"),
+        ),
     ]
 }
