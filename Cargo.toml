@@ -1,6 +1,6 @@
 [package]
 name = "freedesktop-desktop-entry"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition = "2018"
 homepage = "https://github.com/pop-os/freedesktop-desktop-entry"
@@ -12,4 +12,5 @@ categories = [ "os::unix-apis" ]
 keywords = [ "freedesktop", "desktop", "entry" ]
 
 [dependencies]
-markup = "0.3.1"
+dirs = "3.0.2"
+memchr = "2.4.0"
