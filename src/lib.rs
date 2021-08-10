@@ -58,7 +58,7 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Comment", locale)
     }
 
-    pub fn decode<'b>(path: &'b Path, input: &'b str) -> Result<DesktopEntry<'b>, DecodeError>  {
+    pub fn decode<'b>(path: &'b Path, input: &'b str) -> Result<DesktopEntry<'b>, DecodeError> {
         let appid = path
             .file_stem()
             .ok_or(DecodeError::AppID)?
@@ -110,7 +110,11 @@ impl<'a> DesktopEntry<'a> {
             }
         }
 
-        Ok(DesktopEntry { appid, groups, path })
+        Ok(DesktopEntry {
+            appid,
+            groups,
+            path,
+        })
     }
 
     pub fn desktop_entry(&self, key: &str, locale: Option<&str>) -> Option<&'a str> {
@@ -209,7 +213,7 @@ pub enum PathSource {
     System,
     SystemFlatpak,
     SystemSnap,
-    Other(String)
+    Other(String),
 }
 
 pub fn default_paths() -> Vec<(PathSource, PathBuf)> {
