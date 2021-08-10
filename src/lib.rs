@@ -1,13 +1,9 @@
-mod decoder;
 mod iter;
-mod owned;
 
-pub use self::decoder::decode;
 pub use self::iter::Iter;
-pub use self::owned::DesktopEntryBuf;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub type Group<'a> = &'a str;
 pub type Groups<'a> = BTreeMap<Group<'a>, KeyMap<'a>>;
@@ -17,9 +13,14 @@ pub type Locale<'a> = &'a str;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = &'a str;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum DecodeError {
+    AppID,
+}
+
 #[derive(Debug)]
 pub struct DesktopEntry<'a> {
-    pub path: PathBuf,
+    pub appid: &'a str,
     pub groups: Groups<'a>,
 }
 
@@ -52,6 +53,61 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Comment", locale)
     }
 
+    pub fn decode<'b>(path: &'b Path, input: &'b str) -> Result<DesktopEntry<'b>, DecodeError>  {
+        let appid = path
+            .file_stem()
+            .ok_or(DecodeError::AppID)?
+            .to_str()
+            .ok_or(DecodeError::AppID)?;
+
+        let mut groups = Groups::new();
+
+        let mut active_group = "";
+
+        for mut line in input.lines() {
+            line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            let line_bytes = line.as_bytes();
+
+            if line_bytes[0] == b'[' {
+                if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
+                    active_group = &line[1..end + 1];
+                }
+            } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
+                let key = &line[..delimiter];
+                let value = &line[delimiter + 1..];
+
+                if key.as_bytes()[key.len() - 1] == b']' {
+                    if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
+                        let key_name = &key[..start];
+                        let locale = &key[start + 1..key.len() - 1];
+                        groups
+                            .entry(active_group)
+                            .or_insert_with(Default::default)
+                            .entry(key_name)
+                            .or_insert_with(|| ("", LocaleMap::new()))
+                            .1
+                            .insert(locale, value);
+
+                        continue;
+                    }
+                }
+
+                groups
+                    .entry(active_group)
+                    .or_insert_with(Default::default)
+                    .entry(key)
+                    .or_insert_with(|| ("", BTreeMap::new()))
+                    .0 = value;
+            }
+        }
+
+        Ok(DesktopEntry { appid, groups })
+    }
+
     pub fn desktop_entry(&self, key: &str, locale: Option<&str>) -> Option<&'a str> {
         Self::localized_entry(self.groups.get("Desktop Entry"), key, locale)
     }
@@ -65,11 +121,7 @@ impl<'a> DesktopEntry<'a> {
     }
 
     pub fn id(&self) -> &str {
-        self.path
-            .file_name()
-            .expect("desktop entry without a file name")
-            .to_str()
-            .expect("desktop entry has a filename that is not UTF-8")
+        self.appid
     }
 
     pub fn keywords(&self) -> Option<&'a str> {
@@ -86,6 +138,10 @@ impl<'a> DesktopEntry<'a> {
 
     pub fn no_display(&self) -> bool {
         self.desktop_entry_bool("NoDisplay")
+    }
+
+    pub fn only_show_in(&self) -> Option<&'a str> {
+        self.desktop_entry("OnlyShowIn", None)
     }
 
     pub fn prefers_non_default_gpu(&self) -> bool {
@@ -140,7 +196,7 @@ impl<'a> Display for DesktopEntry<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathSource {
     Local,
     LocalDesktop,
@@ -148,6 +204,7 @@ pub enum PathSource {
     System,
     SystemFlatpak,
     SystemSnap,
+    Other(String)
 }
 
 pub fn default_paths() -> Vec<(PathSource, PathBuf)> {

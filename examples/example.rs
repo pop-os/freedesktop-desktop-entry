@@ -1,12 +1,13 @@
 use std::fs;
 
-use freedesktop_desktop_entry as desktop_entry;
+use freedesktop_desktop_entry::{default_paths, DesktopEntry, Iter};
 
 fn main() {
-    for (path_src, entry) in desktop_entry::Iter::new(desktop_entry::default_paths()) {
-        if let Ok(bytes) = fs::read_to_string(&entry) {
-            let entry = desktop_entry::decode(entry, &bytes);
-            println!("{:?}: {}\n---\n{}", path_src, entry.path.display(), entry);
+    for (path_src, path) in Iter::new(default_paths()) {
+        if let Ok(bytes) = fs::read_to_string(&path) {
+            if let Ok(entry) = DesktopEntry::decode(&path, &bytes) {
+                println!("{:?}: {}\n---\n{}", path_src, path.display(), entry);
+            }
         }
     }
 }
