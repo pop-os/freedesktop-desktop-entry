@@ -1,10 +1,10 @@
 [package]
 name = "freedesktop-desktop-entry"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition = "2018"
-homepage = "https://github.com/pop-os/freedesktop-desktop-entry"
-repository = "https://github.com/pop-os/freedesktop-desktop-entry"
+homepage = "https://codeberg.org/mmstick/freedesktop-desktop-entry"
+repository = "https://codeberg.org/mmstick/freedesktop-desktop-entry"
 description = "Freedesktop Desktop Entry Specification"
 license = "MIT/Apache-2.0"
 readme = "README.md"
