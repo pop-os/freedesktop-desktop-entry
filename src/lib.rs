@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate thiserror;
+
 mod iter;
 
 pub use self::iter::Iter;
@@ -13,8 +16,9 @@ pub type Locale<'a> = &'a str;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = &'a str;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Error, PartialEq, Eq)]
 pub enum DecodeError {
+    #[error("path does not contain a valid app ID")]
     AppID,
 }
 

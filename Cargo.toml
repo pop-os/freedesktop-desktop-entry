@@ -14,3 +14,4 @@ keywords = [ "freedesktop", "desktop", "entry" ]
 [dependencies]
 dirs = "3"
 memchr = "2"
+thiserror = "1"
