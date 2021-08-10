@@ -10,6 +10,7 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 categories = [ "os::unix-apis" ]
 keywords = [ "freedesktop", "desktop", "entry" ]
+maintenance = { status = "passively-maintained" }
 
 [dependencies]
 dirs = "3"
