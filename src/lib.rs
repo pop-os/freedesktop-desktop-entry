@@ -22,6 +22,7 @@ pub enum DecodeError {
 pub struct DesktopEntry<'a> {
     pub appid: &'a str,
     pub groups: Groups<'a>,
+    pub path: &'a Path,
 }
 
 impl<'a> DesktopEntry<'a> {
@@ -105,7 +106,7 @@ impl<'a> DesktopEntry<'a> {
             }
         }
 
-        Ok(DesktopEntry { appid, groups })
+        Ok(DesktopEntry { appid, groups, path })
     }
 
     pub fn desktop_entry(&self, key: &str, locale: Option<&str>) -> Option<&'a str> {
