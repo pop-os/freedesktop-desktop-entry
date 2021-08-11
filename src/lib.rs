@@ -181,7 +181,7 @@ impl<'a> DesktopEntry<'a> {
         group.and_then(|group| group.get(key)).and_then(|key| {
             locale
                 .and_then(|locale| key.1.get(locale).cloned())
-                .or_else(|| Some(key.0))
+                .or(Some(key.0))
         })
     }
 }
@@ -205,7 +205,7 @@ impl<'a> Display for DesktopEntry<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum PathSource {
     Local,
     LocalDesktop,

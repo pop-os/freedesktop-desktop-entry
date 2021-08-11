@@ -46,11 +46,11 @@ impl Iterator for Iter {
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
                             self.directories_to_walk.push((path_src.clone(), path));
-                        } else if file_type.is_file() || file_type.is_symlink() {
-                            if path.extension().map_or(false, |ext| ext == "desktop") {
-                                self.actively_walking = Some((path_src.clone(), iterator));
-                                return Some((path_src, path));
-                            }
+                        } else if (file_type.is_file() || file_type.is_symlink())
+                            && path.extension().map_or(false, |ext| ext == "desktop")
+                        {
+                            self.actively_walking = Some((path_src.clone(), iterator));
+                            return Some((path_src, path));
                         }
                     }
                 }
