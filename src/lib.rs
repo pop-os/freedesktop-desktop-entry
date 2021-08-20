@@ -160,6 +160,14 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Exec")
     }
 
+    pub fn flatpak(&'a self) -> Option<&'a str> {
+        self.desktop_entry("X-Flatpak")
+    }
+
+    pub fn generic_name(&'a self, locale: Option<&str>) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("GenericName", locale)
+    }
+
     pub fn icon(&'a self) -> Option<&'a str> {
         self.desktop_entry("Icon")
     }
@@ -194,6 +202,10 @@ impl<'a> DesktopEntry<'a> {
 
     pub fn startup_notify(&'a self) -> bool {
         self.desktop_entry_bool("StartupNotify")
+    }
+
+    pub fn startup_wm_class(&'a self) -> Option<&'a str> {
+        self.desktop_entry("StartupWMClass")
     }
 
     pub fn terminal(&'a self) -> bool {
