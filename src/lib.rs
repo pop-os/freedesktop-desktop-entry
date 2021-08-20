@@ -180,7 +180,16 @@ impl<'a> DesktopEntry<'a> {
     ) -> Option<&'a str> {
         group.and_then(|group| group.get(key)).and_then(|key| {
             locale
-                .and_then(|locale| key.1.get(locale).cloned())
+                .and_then(|locale| match key.1.get(locale) {
+                    Some(value) => Some(*value),
+                    None => {
+                        if let Some(pos) = locale.find('_') {
+                            key.1.get(&locale[..pos]).cloned()
+                        } else {
+                            None
+                        }
+                    }
+                })
                 .or(Some(key.0))
         })
     }
