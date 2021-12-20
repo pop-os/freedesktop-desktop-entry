@@ -1,3 +1,6 @@
+// Copyright 2021 System76 <info@system76.com>
+// SPDX-License-Identifier: MPL-2.0
+
 use crate::PathSource;
 use std::{fs, path::PathBuf};
 
