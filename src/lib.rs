@@ -276,6 +276,8 @@ pub enum PathSource {
     Local,
     LocalDesktop,
     LocalFlatpak,
+    LocalNix,
+    Nix,
     System,
     SystemFlatpak,
     SystemSnap,
@@ -296,12 +298,20 @@ pub fn default_paths() -> Vec<(PathSource, PathBuf)> {
             home_dir.join(".local/share/applications"),
         ),
         (
+            PathSource::LocalNix,
+            home_dir.join(".nix-profile/share/applications"),
+        ),
+        (
             PathSource::SystemSnap,
             PathBuf::from("/var/lib/snapd/desktop/applications"),
         ),
         (
             PathSource::SystemFlatpak,
             PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+        ),
+        (
+            PathSource::Nix,
+            PathBuf::from("/nix/var/nix/profiles/default/share/applications"),
         ),
         (PathSource::System, PathBuf::from("/usr/share/applications")),
     ]
