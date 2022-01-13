@@ -9,7 +9,9 @@ mod iter;
 pub use self::iter::Iter;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+
 use std::path::{Path, PathBuf};
+use xdg::BaseDirectories;
 
 pub type Group<'a> = &'a str;
 pub type Groups<'a> = BTreeMap<Group<'a>, KeyMap<'a>>;
@@ -279,42 +281,53 @@ pub enum PathSource {
     LocalNix,
     Nix,
     System,
+    SystemLocal,
     SystemFlatpak,
     SystemSnap,
     Other(String),
 }
 
-pub fn default_paths() -> Vec<(PathSource, PathBuf)> {
-    let home_dir = dirs::home_dir().unwrap();
+impl PathSource {
 
-    vec![
-        (PathSource::LocalDesktop, home_dir.join("Desktop")),
-        (
-            PathSource::LocalFlatpak,
-            home_dir.join(".local/share/flatpak/exports/share/applications"),
-        ),
-        (
-            PathSource::Local,
-            home_dir.join(".local/share/applications"),
-        ),
-        (
-            PathSource::LocalNix,
-            home_dir.join(".nix-profile/share/applications"),
-        ),
-        (
-            PathSource::SystemSnap,
-            PathBuf::from("/var/lib/snapd/desktop/applications"),
-        ),
-        (
-            PathSource::SystemFlatpak,
-            PathBuf::from("/var/lib/flatpak/exports/share/applications"),
-        ),
-        (
-            PathSource::Nix,
-            PathBuf::from("/nix/var/nix/profiles/default/share/applications"),
-        ),
-        (PathSource::System, PathBuf::from("/usr/share/applications")),
-    ]
+    /// Attempts to determine the PathSource for a given Path.
+    /// Note that this is a best-effort guesting function, and its results should be treated as
+    /// such (e.g.: non-canonical).
+    fn guess_from(path: &Path) -> PathSource {
+        let base_dirs = BaseDirectories::new().unwrap();
+        let data_home = base_dirs.get_data_home();
+
+        if path.starts_with("/usr/share") {
+            PathSource::System
+        } else if path.starts_with("/usr/local/share") {
+            PathSource::SystemLocal
+        } else if path.starts_with("/var/lib/flatpak") {
+            PathSource::SystemFlatpak
+        } else if path.starts_with("/var/lib/snapd") {
+            PathSource::SystemSnap
+        } else if path.starts_with("/nix") {
+            PathSource::Nix
+        } else if path.to_string_lossy().contains("/flatpak/") {
+            PathSource::LocalFlatpak
+        } else if path.starts_with(&data_home.as_path()) {
+            PathSource::Local
+        } else if path.to_string_lossy().contains(".nix") {
+            PathSource::LocalNix
+        } else {
+            PathSource::Other(String::from("unknown"))
+        }
+    }
+}
+
+/// Returns the default paths in which desktop entries should be searched for based on the current
+/// environment.
+///
+/// Panics in case determining the current home directory fails.
+pub fn default_paths() -> Vec<PathBuf> {
+    let base_dirs = BaseDirectories::new().unwrap();
+    let mut data_dirs = base_dirs.get_data_dirs();
+    data_dirs.push(base_dirs.get_data_home());
+
+    data_dirs.iter().map(|d| d.join("applications")).collect()
 }
 
 fn dgettext(domain: &str, message: &str) -> String {
