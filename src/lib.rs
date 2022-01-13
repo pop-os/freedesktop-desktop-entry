@@ -292,7 +292,7 @@ impl PathSource {
     /// Attempts to determine the PathSource for a given Path.
     /// Note that this is a best-effort guesting function, and its results should be treated as
     /// such (e.g.: non-canonical).
-    fn guess_from(path: &Path) -> PathSource {
+    pub fn guess_from(path: &Path) -> PathSource {
         let base_dirs = BaseDirectories::new().unwrap();
         let data_home = base_dirs.get_data_home();
 
