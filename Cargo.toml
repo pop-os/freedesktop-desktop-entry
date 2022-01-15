@@ -1,6 +1,6 @@
 [package]
 name = "freedesktop-desktop-entry"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition = "2018"
 homepage = "https://github.com/pop-os/freedesktop-desktop-entry"
