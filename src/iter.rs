@@ -1,16 +1,15 @@
 // Copyright 2021 System76 <info@system76.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::PathSource;
 use std::{fs, path::PathBuf};
 
 pub struct Iter {
-    directories_to_walk: Vec<(PathSource, PathBuf)>,
-    actively_walking: Option<(PathSource, fs::ReadDir)>,
+    directories_to_walk: Vec<PathBuf>,
+    actively_walking: Option<fs::ReadDir>,
 }
 
 impl Iter {
-    pub fn new(directories_to_walk: Vec<(PathSource, PathBuf)>) -> Self {
+    pub fn new(directories_to_walk: Vec<PathBuf>) -> Self {
         Self {
             directories_to_walk,
             actively_walking: None,
@@ -19,17 +18,17 @@ impl Iter {
 }
 
 impl Iterator for Iter {
-    type Item = (PathSource, PathBuf);
+    type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
         'outer: loop {
-            let (path_src, mut iterator) = match self.actively_walking.take() {
+            let mut iterator = match self.actively_walking.take() {
                 Some(dir) => dir,
                 None => {
-                    while let Some((path_src, path)) = self.directories_to_walk.pop() {
+                    while let Some(path) = self.directories_to_walk.pop() {
                         match fs::read_dir(&path) {
                             Ok(directory) => {
-                                self.actively_walking = Some((path_src, directory));
+                                self.actively_walking = Some(directory);
                                 continue 'outer;
                             }
 
@@ -48,12 +47,12 @@ impl Iterator for Iter {
 
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
-                            self.directories_to_walk.push((path_src.clone(), path));
+                            self.directories_to_walk.push(path);
                         } else if (file_type.is_file() || file_type.is_symlink())
                             && path.extension().map_or(false, |ext| ext == "desktop")
                         {
-                            self.actively_walking = Some((path_src.clone(), iterator));
-                            return Some((path_src, path));
+                            self.actively_walking = Some(iterator);
+                            return Some(path);
                         }
                     }
                 }

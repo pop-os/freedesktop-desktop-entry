@@ -3,10 +3,11 @@
 
 use std::fs;
 
-use freedesktop_desktop_entry::{default_paths, DesktopEntry, Iter};
+use freedesktop_desktop_entry::{default_paths, DesktopEntry, Iter, PathSource};
 
 fn main() {
-    for (path_src, path) in Iter::new(default_paths()) {
+    for path in Iter::new(default_paths()) {
+        let path_src = PathSource::guess_from(&path);
         if let Ok(bytes) = fs::read_to_string(&path) {
             if let Ok(entry) = DesktopEntry::decode(&path, &bytes) {
                 println!("{:?}: {}\n---\n{}", path_src, path.display(), entry);
