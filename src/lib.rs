@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate thiserror;
 
+pub mod exec;
 mod iter;
 
 pub use self::iter::Iter;
@@ -288,7 +289,6 @@ pub enum PathSource {
 }
 
 impl PathSource {
-
     /// Attempts to determine the PathSource for a given Path.
     /// Note that this is a best-effort guesting function, and its results should be treated as
     /// such (e.g.: non-canonical).
@@ -304,15 +304,19 @@ impl PathSource {
             PathSource::SystemFlatpak
         } else if path.starts_with("/var/lib/snapd") {
             PathSource::SystemSnap
-        } else if path.starts_with("/nix/var/nix/profiles/default") || path.starts_with("/nix/store") {
+        } else if path.starts_with("/nix/var/nix/profiles/default")
+            || path.starts_with("/nix/store")
+        {
             PathSource::Nix
         } else if path.to_string_lossy().contains("/flatpak/") {
             PathSource::LocalFlatpak
         } else if path.starts_with(&data_home.as_path()) {
             PathSource::Local
-        } else if path.starts_with("/nix/var/nix/profiles/per-user") || path.to_string_lossy().contains(".nix") {
+        } else if path.starts_with("/nix/var/nix/profiles/per-user")
+            || path.to_string_lossy().contains(".nix")
+        {
             PathSource::LocalNix
-        } else  {
+        } else {
             PathSource::Other(String::from("unknown"))
         }
     }
