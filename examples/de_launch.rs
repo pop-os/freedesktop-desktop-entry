@@ -8,6 +8,5 @@ fn main() {
     let path = PathBuf::from(path);
     let input = fs::read_to_string(&path).expect("Failed to read file");
     let de = DesktopEntry::decode(path.as_path(), &input).expect("Error decoding desktop entry");
-    de.launch(&[], false)
-        .expect("Failed to run desktop entry");
+    de.launch(&[], false).expect("Failed to run desktop entry");
 }
