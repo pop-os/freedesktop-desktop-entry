@@ -4,21 +4,29 @@ use crate::DesktopEntry;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::process::Command;
+use zbus::blocking::Connection;
 
+mod dbus;
 pub mod error;
 mod graphics;
 
 impl DesktopEntry<'_> {
     /// Execute the given desktop entry `Exec` key with either the default gpu or
     /// the alternative one if available.
-    pub fn launch(
-        &self,
-        filename: Option<&str>,
-        filenames: &[&str],
-        url: Option<&str>,
-        urls: &[&str],
-        prefer_non_default_gpu: bool,
-    ) -> Result<(), ExecError> {
+    pub fn launch(&self, uris: &[&str], prefer_non_default_gpu: bool) -> Result<(), ExecError> {
+        match Connection::session() {
+            Ok(conn) => {
+                if self.is_bus_actionable(&conn) {
+                    self.dbus_launch(&conn, uris, prefer_non_default_gpu)
+                } else {
+                    self.shell_launch(uris, prefer_non_default_gpu)
+                }
+            }
+            Err(_) => self.shell_launch(uris, prefer_non_default_gpu),
+        }
+    }
+
+    fn shell_launch(&self, uris: &[&str], prefer_non_default_gpu: bool) -> Result<(), ExecError> {
         let exec = self.exec();
         if exec.is_none() {
             return Err(ExecError::MissingExecKey(self.path));
@@ -42,7 +50,7 @@ impl DesktopEntry<'_> {
             exec_args.push(arg);
         }
 
-        let exec_args = self.get_args(filename, filenames, url, urls, exec_args);
+        let exec_args = self.get_args(uris, exec_args);
 
         if exec_args.is_empty() {
             return Err(ExecError::EmptyExecString);
@@ -63,8 +71,8 @@ impl DesktopEntry<'_> {
                 cmd
             }
             .args(args)
-            .output()?
-            .status
+            .spawn()?
+            .try_wait()?
         } else {
             let mut cmd = Command::new(shell);
 
@@ -74,44 +82,33 @@ impl DesktopEntry<'_> {
                 cmd
             }
             .args(&["-c", &exec_args])
-            .output()?
-            .status
+            .spawn()?
+            .try_wait()?
         };
 
-        if !status.success() {
-            return Err(ExecError::NonZeroStatusCode {
-                status: status.code(),
-                exec: exec.to_string(),
-            });
+        if let Some(status) = status {
+            if !status.success() {
+                return Err(ExecError::NonZeroStatusCode {
+                    status: status.code(),
+                    exec: exec.to_string(),
+                });
+            }
         }
 
         Ok(())
     }
 
     // Replace field code with their values and ignore deprecated and unknown field codes
-    fn get_args(
-        &self,
-        filename: Option<&str>,
-        filenames: &[&str],
-        url: Option<&str>,
-        urls: &[&str],
-        exec_args: Vec<ArgOrFieldCode>,
-    ) -> Vec<String> {
+    fn get_args(&self, uris: &[&str], exec_args: Vec<ArgOrFieldCode>) -> Vec<String> {
         exec_args
             .iter()
             .filter_map(|arg| match arg {
-                ArgOrFieldCode::SingleFileName => filename.map(|filename| filename.to_string()),
-                ArgOrFieldCode::FileList => {
-                    if !filenames.is_empty() {
-                        Some(filenames.join(" "))
-                    } else {
-                        None
-                    }
+                ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
+                    uris.get(0).map(|filename| filename.to_string())
                 }
-                ArgOrFieldCode::SingleUrl => url.map(|url| url.to_string()),
-                ArgOrFieldCode::UrlList => {
-                    if !urls.is_empty() {
-                        Some(urls.join(" "))
+                ArgOrFieldCode::FileList | ArgOrFieldCode::UrlList => {
+                    if !uris.is_empty() {
+                        Some(uris.join(" "))
                     } else {
                         None
                     }
@@ -129,7 +126,6 @@ impl DesktopEntry<'_> {
                 ArgOrFieldCode::DesktopFileLocation => {
                     Some(self.path.to_string_lossy().to_string())
                 }
-                // Ignore deprecated field-codes
                 ArgOrFieldCode::Arg(arg) => Some(arg.to_string()),
             })
             .collect()
@@ -227,7 +223,7 @@ mod test {
         let path = PathBuf::from("tests/entries/unmatched-quotes.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let result = de.launch(&[], false);
 
         assert_that!(result)
             .is_err()
@@ -239,7 +235,7 @@ mod test {
         let path = PathBuf::from("tests/entries/empty-exec.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(Path::new(path.as_path()), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let result = de.launch(&[], false);
 
         assert_that!(result)
             .is_err()
@@ -252,7 +248,7 @@ mod test {
         let path = PathBuf::from("tests/entries/alacritty-simple.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let result = de.launch(&[], false);
 
         assert_that!(result).is_ok();
     }
@@ -263,7 +259,7 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let result = de.launch(&[], false);
 
         assert_that!(result).is_ok();
     }
@@ -274,7 +270,43 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let result = de.launch(&[], false);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with nvim installed, run locally only"]
+    fn should_launch_with_field_codes() {
+        let path = PathBuf::from("/usr/share/applications/nvim.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&["src/lib.rs"], false);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with gnome Books installed, run locally only"]
+    fn should_launch_with_dbus() {
+        let path = PathBuf::from("/usr/share/applications/org.gnome.Books.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&[], false);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with Nautilus installed, run locally only"]
+    fn should_launch_with_dbus_and_field_codes() {
+        let path = PathBuf::from("/usr/share/applications/org.gnome.Nautilus.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let path = std::env::current_dir().unwrap();
+        let path = path.to_string_lossy();
+        let path = format!("file:///{path}");
+        let result = de.launch(&[path.as_str()], false);
 
         assert_that!(result).is_ok();
     }
