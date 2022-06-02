@@ -11,4 +11,5 @@ fn main() {
     let de = DesktopEntry::from_path(path, &locales).expect("Error decoding desktop entry");
     de.launch(&[], false, &locales)
         .expect("Failed to run desktop entry");
+
 }
