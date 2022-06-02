@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod decoder;
+pub mod exec;
 mod iter;
 
 pub mod matching;
