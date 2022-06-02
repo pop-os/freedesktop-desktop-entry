@@ -18,7 +18,17 @@ textdistance = "1.0.2"
 strsim = "0.11.1"
 thiserror = "1"
 xdg = "2.4.0"
-udev = "0.6.3"
+udev = "0.8.0"
+zbus = "4.2.2"
 
 [dev-dependencies]
-speculoos = "0.9.0"
+speculoos = "0.11.0"
+
+[[example]]
+name = "de-launch"
+path = "examples/de_launch.rs"
+
+
+[[example]]
+name = "de-list"
+path = "examples/de_list.rs"

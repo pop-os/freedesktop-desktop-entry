@@ -1,24 +1,49 @@
 use crate::exec::error::ExecError;
 use crate::exec::graphics::Gpus;
 use crate::DesktopEntry;
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::process::Command;
+use zbus::blocking::Connection;
 
+mod dbus;
 pub mod error;
 mod graphics;
 
-impl DesktopEntry<'_> {
+impl<'a> DesktopEntry<'a> {
     /// Execute the given desktop entry `Exec` key with either the default gpu or
     /// the alternative one if available.
-    pub fn launch(
+    pub fn launch<L>(
         &self,
-        filename: Option<&str>,
-        filenames: &[&str],
-        url: Option<&str>,
-        urls: &[&str],
+        uris: &[&'a str],
         prefer_non_default_gpu: bool,
-    ) -> Result<(), ExecError> {
+        locales: &[L],
+    ) -> Result<(), ExecError>
+    where
+        L: AsRef<str>,
+    {
+        match Connection::session() {
+            Ok(conn) => {
+                if self.is_bus_actionable(&conn) {
+                    self.dbus_launch(&conn, uris, prefer_non_default_gpu)
+                } else {
+                    self.shell_launch(uris, prefer_non_default_gpu, locales)
+                }
+            }
+            Err(_) => self.shell_launch(uris, prefer_non_default_gpu, locales),
+        }
+    }
+
+    fn shell_launch<L>(
+        &self,
+        uris: &[&str],
+        prefer_non_default_gpu: bool,
+        locales: &[L],
+    ) -> Result<(), ExecError>
+    where
+        L: AsRef<str>,
+    {
         let exec = self.exec();
         if exec.is_none() {
             return Err(ExecError::MissingExecKey(&self.path));
@@ -42,7 +67,7 @@ impl DesktopEntry<'_> {
             exec_args.push(arg);
         }
 
-        let exec_args = self.get_args(filename, filenames, url, urls, exec_args);
+        let exec_args = self.get_args(uris, exec_args, locales);
 
         if exec_args.is_empty() {
             return Err(ExecError::EmptyExecString);
@@ -63,8 +88,8 @@ impl DesktopEntry<'_> {
                 cmd
             }
             .args(args)
-            .output()?
-            .status
+            .spawn()?
+            .try_wait()?
         } else {
             let mut cmd = Command::new(shell);
 
@@ -74,65 +99,65 @@ impl DesktopEntry<'_> {
                 cmd
             }
             .args(&["-c", &exec_args])
-            .output()?
-            .status
+            .spawn()?
+            .try_wait()?
         };
 
-        if !status.success() {
-            return Err(ExecError::NonZeroStatusCode {
-                status: status.code(),
-                exec: exec.to_string(),
-            });
+        if let Some(status) = status {
+            if !status.success() {
+                return Err(ExecError::NonZeroStatusCode {
+                    status: status.code(),
+                    exec: exec.to_string(),
+                });
+            }
         }
 
         Ok(())
     }
 
     // Replace field code with their values and ignore deprecated and unknown field codes
-    fn get_args(
-        &self,
-        filename: Option<&str>,
-        filenames: &[&str],
-        url: Option<&str>,
-        urls: &[&str],
-        exec_args: Vec<ArgOrFieldCode>,
-    ) -> Vec<String> {
-        exec_args
-            .iter()
-            .filter_map(|arg| match arg {
-                ArgOrFieldCode::SingleFileName => filename.map(|filename| filename.to_string()),
-                ArgOrFieldCode::FileList => {
-                    if !filenames.is_empty() {
-                        Some(filenames.join(" "))
-                    } else {
-                        None
+    fn get_args<L>(
+        &'a self,
+        uris: &[&'a str],
+        exec_args: Vec<ArgOrFieldCode<'a>>,
+        locales: &[L],
+    ) -> Vec<Cow<'a, str>>
+    where
+        L: AsRef<str>,
+    {
+        let mut final_args: Vec<Cow<str>> = Vec::new();
+
+        for arg in exec_args {
+            match arg {
+                ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
+                    if let Some(arg) = uris.get(0) {
+                        final_args.push(Cow::Borrowed(arg));
                     }
                 }
-                ArgOrFieldCode::SingleUrl => url.map(|url| url.to_string()),
-                ArgOrFieldCode::UrlList => {
-                    if !urls.is_empty() {
-                        Some(urls.join(" "))
-                    } else {
-                        None
+                ArgOrFieldCode::FileList | ArgOrFieldCode::UrlList => {
+                    uris.into_iter()
+                        .for_each(|uri| final_args.push(Cow::Borrowed(uri)));
+                }
+                ArgOrFieldCode::IconKey => {
+                    if let Some(icon) = self.icon() {
+                        final_args.push(Cow::Borrowed(&icon));
                     }
                 }
-                ArgOrFieldCode::IconKey => self.icon().map(ToString::to_string),
                 ArgOrFieldCode::TranslatedName => {
-                    let locale = std::env::var("LANG").ok();
-                    if let Some(locale) = locale {
-                        let locale = locale.split_once('.').map(|(locale, _)| locale);
-                        self.name(locale).map(|locale| locale.to_string())
-                    } else {
-                        None
+                    if let Some(name) = self.name(locales) {
+                        final_args.push(name.clone());
                     }
                 }
                 ArgOrFieldCode::DesktopFileLocation => {
-                    Some(self.path.to_string_lossy().to_string())
+                    final_args.push(self.path.to_string_lossy());
                 }
-                // Ignore deprecated field-codes
-                ArgOrFieldCode::Arg(arg) => Some(arg.to_string()),
-            })
-            .collect()
+                ArgOrFieldCode::Arg(arg) => {
+                    final_args.push(Cow::Borrowed(&arg));
+                }
+            }
+        }
+
+        final_args
     }
 }
 
@@ -216,7 +241,7 @@ fn detect_terminal() -> (PathBuf, &'static str) {
 mod test {
     use crate::exec::error::ExecError;
     use crate::exec::with_non_default_gpu;
-    use crate::DesktopEntry;
+    use crate::{get_languages_from_env, DesktopEntry};
     use speculoos::prelude::*;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -225,9 +250,9 @@ mod test {
     #[test]
     fn should_return_unmatched_quote_error() {
         let path = PathBuf::from("tests/entries/unmatched-quotes.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&[], false, &locales);
 
         assert_that!(result)
             .is_err()
@@ -237,9 +262,9 @@ mod test {
     #[test]
     fn should_fail_if_exec_string_is_empty() {
         let path = PathBuf::from("tests/entries/empty-exec.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(Path::new(path.as_path()), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&[], false, &locales);
 
         assert_that!(result)
             .is_err()
@@ -250,9 +275,9 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty installed, run locally only"]
     fn should_exec_simple_command() {
         let path = PathBuf::from("tests/entries/alacritty-simple.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&[], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -261,9 +286,9 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty and mesa-utils installed, run locally only"]
     fn should_exec_complex_command() {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&[], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -272,9 +297,46 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty and mesa-utils installed, run locally only"]
     fn should_exec_terminal_command() {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(None, &[], None, &[], false);
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&[], false, &locales);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with nvim installed, run locally only"]
+    fn should_launch_with_field_codes() {
+        let path = PathBuf::from("/usr/share/applications/nvim.desktop");
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&["src/lib.rs"], false, &locales);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with gnome Books installed, run locally only"]
+    fn should_launch_with_dbus() {
+        let path = PathBuf::from("/usr/share/applications/org.gnome.Books.desktop");
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let result = de.launch(&["src/lib.rs"], false, &locales);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with Nautilus installed, run locally only"]
+    fn should_launch_with_dbus_and_field_codes() {
+        let path = PathBuf::from("/usr/share/applications/org.gnome.Nautilus.desktop");
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, &locales).unwrap();
+        let _result = de.launch(&[], false, &locales);
+        let path = std::env::current_dir().unwrap();
+        let path = path.to_string_lossy();
+        let path = format!("file:///{path}");
+        let result = de.launch(&[path.as_str()], false, &locales);
 
         assert_that!(result).is_ok();
     }
