@@ -62,7 +62,7 @@ impl DesktopEntry<'_> {
             return false;
         }
 
-        let dbus_proxy = dbus_proxy;
+        let dbus_proxy = dbus_proxy.unwrap();
         let dbus_names = dbus_proxy.list_activatable_names();
 
         if dbus_names.is_err() {
