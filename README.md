@@ -1,6 +1,6 @@
 # Freedesktop Desktop Entry Specification
 
-This crate provides a library for efficiently parsing [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/index.html) files.
+This crate provides a library for efficiently parsing and launching [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/index.html) files.
 
 ```rust
 use std::fs;

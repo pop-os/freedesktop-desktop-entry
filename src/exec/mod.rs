@@ -14,7 +14,7 @@ pub mod error;
 mod graphics;
 
 impl DesktopEntry<'_> {
-    /// Execute the given desktop entry `Exec` key with either the default gpu or
+    /// Launch the given desktop entry either via dbus or via its `Exec` key with the default gpu or
     /// the alternative one if available.
     pub fn launch(&self, uris: &[&str], prefer_non_default_gpu: bool) -> Result<(), ExecError> {
         match Connection::session() {
