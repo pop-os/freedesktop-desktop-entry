@@ -8,9 +8,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ExecError<'a> {
-    #[error("Unmatched quote delimiter: '{exec}'")]
-    UnmatchedQuote { exec: String },
-
     #[error("Exec string is empty")]
     EmptyExecString,
 

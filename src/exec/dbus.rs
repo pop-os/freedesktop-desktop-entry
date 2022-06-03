@@ -27,7 +27,6 @@ impl DesktopEntry<'_> {
         &self,
         conn: &Connection,
         uris: &[&str],
-        prefer_non_default_gpu: bool,
     ) -> Result<(), ExecError> {
         let dbus_path = self.appid.replace('.', "/");
         let dbus_path = format!("/{dbus_path}");
@@ -37,7 +36,7 @@ impl DesktopEntry<'_> {
             .build()?;
 
         let mut platform_data = HashMap::new();
-        if prefer_non_default_gpu {
+        if self.prefers_non_default_gpu() {
             let gpus = Gpus::load();
             if let Some(gpu) = gpus.non_default() {
                 for (opt, value) in gpu.launch_options() {

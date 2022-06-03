@@ -17,6 +17,7 @@ mod graphics;
 impl<'a> DesktopEntry<'a> {
     /// Execute the given desktop entry `Exec` key with either the default gpu or
     /// the alternative one if available.
+<<<<<<< HEAD
     pub fn launch<L>(
         &self,
         uris: &[&'a str],
@@ -26,11 +27,15 @@ impl<'a> DesktopEntry<'a> {
     where
         L: AsRef<str>,
     {
+=======
+    pub fn launch(&self, uris: &[&str]) -> Result<(), ExecError> {
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
         match Connection::session() {
             Ok(conn) => {
                 if self.is_bus_actionable(&conn) {
-                    self.dbus_launch(&conn, uris, prefer_non_default_gpu)
+                    self.dbus_launch(&conn, uris)
                 } else {
+<<<<<<< HEAD
                     self.shell_launch(uris, prefer_non_default_gpu, locales)
                 }
             }
@@ -47,21 +52,22 @@ impl<'a> DesktopEntry<'a> {
     where
         L: AsRef<str>,
     {
+=======
+                    self.shell_launch(uris)
+                }
+            }
+            Err(_) => self.shell_launch(uris),
+        }
+    }
+
+    fn shell_launch(&self, uris: &[&str]) -> Result<(), ExecError> {
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
         let exec = self.exec();
         if exec.is_none() {
             return Err(ExecError::MissingExecKey(&self.path));
         }
 
         let exec = exec.unwrap();
-        let exec = if let Some(unquoted_exec) = exec.strip_prefix('\"') {
-            unquoted_exec
-                .strip_suffix('\"')
-                .ok_or(ExecError::UnmatchedQuote {
-                    exec: exec.to_string(),
-                })?
-        } else {
-            exec
-        };
 
         let mut exec_args = vec![];
 
@@ -85,25 +91,25 @@ impl<'a> DesktopEntry<'a> {
             let args = format!("{terminal} {separator} {exec_args}");
             let args = ["-c", &args];
             let mut cmd = Command::new(shell);
-            if prefer_non_default_gpu {
+            if self.prefers_non_default_gpu() {
                 with_non_default_gpu(cmd)
             } else {
                 cmd
             }
-            .args(args)
-            .spawn()?
-            .try_wait()?
+                .args(args)
+                .spawn()?
+                .try_wait()?
         } else {
             let mut cmd = Command::new(shell);
 
-            if prefer_non_default_gpu {
+            if self.prefers_non_default_gpu() {
                 with_non_default_gpu(cmd)
             } else {
                 cmd
             }
-            .args(&["-c", &exec_args])
-            .spawn()?
-            .try_wait()?
+                .args(&["-c", &exec_args])
+                .spawn()?
+                .try_wait()?
         };
 
         if let Some(status) = status {
@@ -251,6 +257,7 @@ mod test {
     use std::process::Command;
 
     #[test]
+<<<<<<< HEAD
     fn should_return_unmatched_quote_error() {
         let path = PathBuf::from("tests/entries/unmatched-quotes.desktop");
         let locales = get_languages_from_env();
@@ -268,6 +275,13 @@ mod test {
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&[], false, &locales);
+=======
+    fn should_fail_if_exec_string_is_empty() {
+        let path = PathBuf::from("tests/entries/empty-exec.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(Path::new(path.as_path()), &input).unwrap();
+        let result = de.launch(&[]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result)
             .is_err()
@@ -278,9 +292,15 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty installed, run locally only"]
     fn should_exec_simple_command() {
         let path = PathBuf::from("tests/entries/alacritty-simple.desktop");
+<<<<<<< HEAD
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&[], false, &locales);
+=======
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&[]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result).is_ok();
     }
@@ -289,9 +309,15 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty and mesa-utils installed, run locally only"]
     fn should_exec_complex_command() {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
+<<<<<<< HEAD
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&[], false, &locales);
+=======
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&[]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result).is_ok();
     }
@@ -300,9 +326,15 @@ mod test {
     #[ignore = "Needs a desktop environment and alacritty and mesa-utils installed, run locally only"]
     fn should_exec_terminal_command() {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
+<<<<<<< HEAD
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&[], false, &locales);
+=======
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&[]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result).is_ok();
     }
@@ -311,9 +343,15 @@ mod test {
     #[ignore = "Needs a desktop environment with nvim installed, run locally only"]
     fn should_launch_with_field_codes() {
         let path = PathBuf::from("/usr/share/applications/nvim.desktop");
+<<<<<<< HEAD
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&["src/lib.rs"], false, &locales);
+=======
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&["src/lib.rs"]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result).is_ok();
     }
@@ -322,9 +360,15 @@ mod test {
     #[ignore = "Needs a desktop environment with gnome Books installed, run locally only"]
     fn should_launch_with_dbus() {
         let path = PathBuf::from("/usr/share/applications/org.gnome.Books.desktop");
+<<<<<<< HEAD
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
         let result = de.launch(&["src/lib.rs"], false, &locales);
+=======
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch(&[]);
+>>>>>>> 8a6e90a (refactor: remove prefer_non_default arg gpu and use desktop entry attribute instead)
 
         assert_that!(result).is_ok();
     }
