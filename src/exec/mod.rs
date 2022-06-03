@@ -16,35 +16,26 @@ mod graphics;
 impl DesktopEntry<'_> {
     /// Launch the given desktop entry either via dbus or via its `Exec` key with the default gpu or
     /// the alternative one if available.
-    pub fn launch(&self, uris: &[&str], prefer_non_default_gpu: bool) -> Result<(), ExecError> {
+    pub fn launch(&self, uris: &[&str]) -> Result<(), ExecError> {
         match Connection::session() {
             Ok(conn) => {
                 if self.is_bus_actionable(&conn) {
-                    self.dbus_launch(&conn, uris, prefer_non_default_gpu)
+                    self.dbus_launch(&conn, uris)
                 } else {
-                    self.shell_launch(uris, prefer_non_default_gpu)
+                    self.shell_launch(uris)
                 }
             }
-            Err(_) => self.shell_launch(uris, prefer_non_default_gpu),
+            Err(_) => self.shell_launch(uris),
         }
     }
 
-    fn shell_launch(&self, uris: &[&str], prefer_non_default_gpu: bool) -> Result<(), ExecError> {
+    fn shell_launch(&self, uris: &[&str]) -> Result<(), ExecError> {
         let exec = self.exec();
         if exec.is_none() {
             return Err(ExecError::MissingExecKey(self.path));
         }
 
         let exec = exec.unwrap();
-        let exec = if let Some(unquoted_exec) = exec.strip_prefix('\"') {
-            unquoted_exec
-                .strip_suffix('\"')
-                .ok_or(ExecError::UnmatchedQuote {
-                    exec: exec.to_string(),
-                })?
-        } else {
-            exec
-        };
 
         let mut exec_args = vec![];
 
@@ -68,25 +59,25 @@ impl DesktopEntry<'_> {
             let args = format!("{terminal} {separator} {exec_args}");
             let args = ["-c", &args];
             let mut cmd = Command::new(shell);
-            if prefer_non_default_gpu {
+            if self.prefers_non_default_gpu() {
                 with_non_default_gpu(cmd)
             } else {
                 cmd
             }
-            .args(args)
-            .spawn()?
-            .try_wait()?
+                .args(args)
+                .spawn()?
+                .try_wait()?
         } else {
             let mut cmd = Command::new(shell);
 
-            if prefer_non_default_gpu {
+            if self.prefers_non_default_gpu() {
                 with_non_default_gpu(cmd)
             } else {
                 cmd
             }
-            .args(&["-c", &exec_args])
-            .spawn()?
-            .try_wait()?
+                .args(&["-c", &exec_args])
+                .spawn()?
+                .try_wait()?
         };
 
         if let Some(status) = status {
@@ -222,23 +213,11 @@ mod test {
     use std::process::Command;
 
     #[test]
-    fn should_return_unmatched_quote_error() {
-        let path = PathBuf::from("tests/entries/unmatched-quotes.desktop");
-        let input = fs::read_to_string(&path).unwrap();
-        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&[], false);
-
-        assert_that!(result)
-            .is_err()
-            .matches(|err| matches!(err, ExecError::UnmatchedQuote { exec: _ }));
-    }
-
-    #[test]
     fn should_fail_if_exec_string_is_empty() {
         let path = PathBuf::from("tests/entries/empty-exec.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(Path::new(path.as_path()), &input).unwrap();
-        let result = de.launch(&[], false);
+        let result = de.launch(&[]);
 
         assert_that!(result)
             .is_err()
@@ -251,7 +230,7 @@ mod test {
         let path = PathBuf::from("tests/entries/alacritty-simple.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&[], false);
+        let result = de.launch(&[]);
 
         assert_that!(result).is_ok();
     }
@@ -262,7 +241,7 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&[], false);
+        let result = de.launch(&[]);
 
         assert_that!(result).is_ok();
     }
@@ -273,7 +252,7 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&[], false);
+        let result = de.launch(&[]);
 
         assert_that!(result).is_ok();
     }
@@ -284,7 +263,7 @@ mod test {
         let path = PathBuf::from("/usr/share/applications/nvim.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&["src/lib.rs"], false);
+        let result = de.launch(&["src/lib.rs"]);
 
         assert_that!(result).is_ok();
     }
@@ -295,7 +274,7 @@ mod test {
         let path = PathBuf::from("/usr/share/applications/org.gnome.Books.desktop");
         let input = fs::read_to_string(&path).unwrap();
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
-        let result = de.launch(&[], false);
+        let result = de.launch(&[]);
 
         assert_that!(result).is_ok();
     }
