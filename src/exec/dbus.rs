@@ -23,11 +23,7 @@ trait Application {
 }
 
 impl DesktopEntry<'_> {
-    pub(crate) fn dbus_launch(
-        &self,
-        conn: &Connection,
-        uris: &[&str],
-    ) -> Result<(), ExecError> {
+    pub(crate) fn dbus_launch(&self, conn: &Connection, uris: &[&str]) -> Result<(), ExecError> {
         let dbus_path = self.appid.replace('.', "/");
         let dbus_path = format!("/{dbus_path}");
         let app_proxy = ApplicationProxyBlocking::builder(conn)

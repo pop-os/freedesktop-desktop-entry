@@ -7,7 +7,10 @@ use std::io;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-const VULKAN_ICD_PATH: &str = std::env!("VULKAN_ICD_PATH", "must define system Vulkan ICD path (ex: `/usr/share/vulkan/icd.d`)");
+const VULKAN_ICD_PATH: &str = std::env!(
+    "VULKAN_ICD_PATH",
+    "must define system Vulkan ICD path (ex: `/usr/share/vulkan/icd.d`)"
+);
 
 #[derive(Debug, Default)]
 pub struct Gpus {
