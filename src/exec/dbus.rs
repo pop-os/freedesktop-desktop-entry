@@ -23,7 +23,12 @@ trait Application {
 }
 
 impl DesktopEntry<'_> {
-    pub(crate) fn dbus_launch(&self, conn: &Connection, uris: &[&str]) -> Result<(), ExecError> {
+    pub(crate) fn dbus_launch(
+        &self,
+        conn: &Connection,
+        uris: &[&str],
+        action: Option<String>,
+    ) -> Result<(), ExecError> {
         let dbus_path = self.appid.replace('.', "/");
         let dbus_path = format!("/{dbus_path}");
         let app_proxy = ApplicationProxyBlocking::builder(conn)
@@ -41,10 +46,21 @@ impl DesktopEntry<'_> {
             }
         }
 
-        if !uris.is_empty() {
-            app_proxy.open(uris, platform_data)?;
-        } else {
-            app_proxy.activate(platform_data)?;
+        match action {
+            None => {
+                if !uris.is_empty() {
+                    app_proxy.open(uris, platform_data)?;
+                } else {
+                    app_proxy.activate(platform_data)?;
+                }
+            }
+            Some(action) => {
+                let parameters: Vec<OwnedValue> = uris
+                    .iter()
+                    .map(|uri| OwnedValue::from(Str::from(*uri)))
+                    .collect();
+                app_proxy.activate_action(&action, parameters.as_slice(), platform_data)?
+            }
         }
 
         Ok(())

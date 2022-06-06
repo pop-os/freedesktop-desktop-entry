@@ -2,4 +2,4 @@
 Exec=glxgears -info
 Terminal=true
 Type=Application
-Name=Alacritty
+Name=GlxGearTerminal

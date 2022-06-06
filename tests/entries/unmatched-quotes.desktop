@@ -2,4 +2,4 @@
 Exec="alacritty -e
 Terminal=false
 Type=Application
-Name=Alacritty
+Name=InvalidCommand

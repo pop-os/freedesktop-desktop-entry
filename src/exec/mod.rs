@@ -16,28 +16,69 @@ pub mod error;
 mod graphics;
 
 impl DesktopEntry<'_> {
+    /// Launch the given desktop entry action either via dbus or via its `Exec` key with the default gpu or
+    /// the alternative one if available.
+    pub fn launch_action(&self, action: &str, uris: &[&str]) -> Result<(), ExecError> {
+        let has_action = self
+            .actions()
+            .map(|actions| actions.split(';').any(|act| act == action))
+            .unwrap_or(false);
+
+        if !has_action {
+            return Err(ExecError::ActionNotFound {
+                action: action.to_string(),
+                desktop_entry: self.path,
+            });
+        }
+
+        match Connection::session() {
+            Ok(conn) => {
+                if self.is_bus_actionable(&conn) {
+                    self.dbus_launch(&conn, uris, Some(action.to_string()))
+                } else {
+                    self.shell_launch(uris, Some(action.to_string()))
+                }
+            }
+            Err(_) => self.shell_launch(uris, Some(action.to_string())),
+        }
+    }
+
     /// Launch the given desktop entry either via dbus or via its `Exec` key with the default gpu or
     /// the alternative one if available.
     pub fn launch(&self, uris: &[&str]) -> Result<(), ExecError> {
         match Connection::session() {
             Ok(conn) => {
                 if self.is_bus_actionable(&conn) {
-                    self.dbus_launch(&conn, uris)
+                    self.dbus_launch(&conn, uris, None)
                 } else {
-                    self.shell_launch(uris)
+                    self.shell_launch(uris, None)
                 }
             }
-            Err(_) => self.shell_launch(uris),
+            Err(_) => self.shell_launch(uris, None),
         }
     }
 
-    fn shell_launch(&self, uris: &[&str]) -> Result<(), ExecError> {
-        let exec = self.exec();
-        if exec.is_none() {
-            return Err(ExecError::MissingExecKey(self.path));
-        }
+    fn shell_launch(&self, uris: &[&str], action: Option<String>) -> Result<(), ExecError> {
+        let exec = match action {
+            None => {
+                let exec = self.exec();
+                if exec.is_none() {
+                    return Err(ExecError::MissingExecKey(self.path));
+                }
+                exec.unwrap()
+            }
+            Some(action) => {
+                let exec = self.action_exec(&action);
+                if exec.is_none() {
+                    return Err(ExecError::ActionExecKeyNotFound {
+                        action,
+                        desktop_entry: self.path,
+                    });
+                }
 
-        let exec = exec.unwrap();
+                exec.unwrap()
+            }
+        };
 
         let mut exec_args = vec![];
 
@@ -281,8 +322,30 @@ mod test {
         let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
         let path = std::env::current_dir().unwrap();
         let path = path.to_string_lossy();
-        let path = format!("file:///{path}");
+        let path = format!("file://{path}");
         let result = de.launch(&[path.as_str()]);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with alacritty installed, run locally only"]
+    fn should_launch_action() {
+        let path = PathBuf::from("/usr/share/applications/Alacritty.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch_action("New", &[]);
+
+        assert_that!(result).is_ok();
+    }
+
+    #[test]
+    #[ignore = "Needs a desktop environment with Nautilus installed, run locally only"]
+    fn should_launch_action_via_dbus() {
+        let path = PathBuf::from("/usr/share/applications/org.gnome.Nautilus.desktop");
+        let input = fs::read_to_string(&path).unwrap();
+        let de = DesktopEntry::decode(path.as_path(), &input).unwrap();
+        let result = de.launch_action("new-window", &[]);
 
         assert_that!(result).is_ok();
     }
