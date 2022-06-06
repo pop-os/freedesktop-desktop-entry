@@ -4,8 +4,13 @@
 use crate::exec::error::ExecError;
 use crate::exec::graphics::Gpus;
 use crate::DesktopEntry;
+<<<<<<< HEAD
 use std::borrow::Cow;
+=======
+use fork::{daemon, Fork};
+>>>>>>> eaa21ff (fix: fork process instead of spawning with std::process::Command)
 use std::convert::TryFrom;
+use std::os::unix::prelude::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use zbus::blocking::Connection;
@@ -85,40 +90,32 @@ impl<'a> DesktopEntry<'a> {
         let exec_args = exec_args.join(" ");
         let shell = std::env::var("SHELL")?;
 
-        let status = if self.terminal() {
-            let (terminal, separator) = detect_terminal();
-            let terminal = terminal.to_string_lossy();
-            let args = format!("{terminal} {separator} {exec_args}");
-            let args = ["-c", &args];
-            let mut cmd = Command::new(shell);
-            if self.prefers_non_default_gpu() {
-                with_non_default_gpu(cmd)
-            } else {
-                cmd
-            }
+        if let Ok(Fork::Child) = daemon(true, false) {
+            if self.terminal() {
+                let (terminal, separator) = detect_terminal();
+                let terminal = terminal.to_string_lossy();
+                let args = format!("{terminal} {separator} {exec_args}");
+                let args = ["-c", &args];
+                let mut cmd = Command::new(shell);
+
+                if self.prefers_non_default_gpu() {
+                    with_non_default_gpu(cmd)
+                } else {
+                    cmd
+                }
                 .args(args)
-                .spawn()?
-                .try_wait()?
-        } else {
-            let mut cmd = Command::new(shell);
-
-            if self.prefers_non_default_gpu() {
-                with_non_default_gpu(cmd)
+                .exec()
             } else {
-                cmd
-            }
-                .args(&["-c", &exec_args])
-                .spawn()?
-                .try_wait()?
-        };
+                let mut cmd = Command::new(shell);
 
-        if let Some(status) = status {
-            if !status.success() {
-                return Err(ExecError::NonZeroStatusCode {
-                    status: status.code(),
-                    exec: exec.to_string(),
-                });
-            }
+                if self.prefers_non_default_gpu() {
+                    with_non_default_gpu(cmd)
+                } else {
+                    cmd
+                }
+                .args(&["-c", &exec_args])
+                .exec()
+            };
         }
 
         Ok(())
@@ -383,7 +380,11 @@ mod test {
         let path = std::env::current_dir().unwrap();
         let path = path.to_string_lossy();
         let path = format!("file:///{path}");
+<<<<<<< HEAD
         let result = de.launch(&[path.as_str()], false, &locales);
+=======
+        let result = de.launch(&[path.as_str()]);
+>>>>>>> eaa21ff (fix: fork process instead of spawning with std::process::Command)
 
         assert_that!(result).is_ok();
     }
