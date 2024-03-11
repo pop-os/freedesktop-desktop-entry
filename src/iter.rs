@@ -25,7 +25,8 @@ impl Iterator for Iter {
             let mut iterator = match self.actively_walking.take() {
                 Some(dir) => dir,
                 None => {
-                    while let Some(path) = self.directories_to_walk.pop() {
+                    while !self.directories_to_walk.is_empty() {
+                        let path = self.directories_to_walk.remove(0);
                         match fs::read_dir(&path) {
                             Ok(directory) => {
                                 self.actively_walking = Some(directory);
@@ -47,7 +48,7 @@ impl Iterator for Iter {
 
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
-                            self.directories_to_walk.push(path);
+                            self.directories_to_walk.insert(0, path);
                         } else if (file_type.is_file() || file_type.is_symlink())
                             && path.extension().map_or(false, |ext| ext == "desktop")
                         {
