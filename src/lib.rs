@@ -327,8 +327,9 @@ impl PathSource {
 /// Panics in case determining the current home directory fails.
 pub fn default_paths() -> Vec<PathBuf> {
     let base_dirs = BaseDirectories::new().unwrap();
-    let mut data_dirs = base_dirs.get_data_dirs();
+    let mut data_dirs: Vec<PathBuf> = vec![];
     data_dirs.push(base_dirs.get_data_home());
+    data_dirs.append(&mut base_dirs.get_data_dirs());
 
     data_dirs.iter().map(|d| d.join("applications")).collect()
 }
