@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate thiserror;
 
+pub mod exec;
 mod iter;
 
 pub use self::iter::Iter;
