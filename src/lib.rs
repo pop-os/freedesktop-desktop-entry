@@ -5,6 +5,9 @@
 extern crate thiserror;
 
 mod iter;
+mod matching;
+
+pub use matching::{try_match_app_id, MatchAppIdOptions};
 
 pub use self::iter::Iter;
 use std::borrow::Cow;
@@ -112,7 +115,7 @@ impl<'a> DesktopEntry<'a> {
                         let locale = &key[start + 1..key.len() - 1];
                         groups
                             .entry(active_group)
-                            .or_insert_with(Default::default)
+                            .or_default()
                             .entry(key_name)
                             .or_insert_with(|| ("", LocaleMap::new()))
                             .1
@@ -129,7 +132,7 @@ impl<'a> DesktopEntry<'a> {
 
                 groups
                     .entry(active_group)
-                    .or_insert_with(Default::default)
+                    .or_default()
                     .entry(key)
                     .or_insert_with(|| ("", BTreeMap::new()))
                     .0 = value;
@@ -309,7 +312,7 @@ impl PathSource {
             PathSource::Nix
         } else if path.to_string_lossy().contains("/flatpak/") {
             PathSource::LocalFlatpak
-        } else if path.starts_with(&data_home.as_path()) {
+        } else if path.starts_with(data_home.as_path()) {
             PathSource::Local
         } else if path.starts_with("/nix/var/nix/profiles/per-user")
             || path.to_string_lossy().contains(".nix")

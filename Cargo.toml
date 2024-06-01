@@ -15,5 +15,6 @@ maintenance = { status = "passively-maintained" }
 dirs = "3"
 gettext-rs = { version = "0.7", features = ["gettext-system"]}
 memchr = "2"
+textdistance = "1.0.2"
 thiserror = "1"
 xdg = "2.4.0"
