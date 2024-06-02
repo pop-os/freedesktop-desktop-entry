@@ -16,13 +16,13 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use xdg::BaseDirectories;
 
-pub type Group<'a> = &'a str;
+pub type Group<'a> = Cow<'a, str>;
 pub type Groups<'a> = BTreeMap<Group<'a>, KeyMap<'a>>;
-pub type Key<'a> = &'a str;
+pub type Key<'a> = Cow<'a, str>;
 pub type KeyMap<'a> = BTreeMap<Key<'a>, (Value<'a>, LocaleMap<'a>)>;
-pub type Locale<'a> = &'a str;
+pub type Locale<'a> = Cow<'a, str>;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
-pub type Value<'a> = &'a str;
+pub type Value<'a> = Cow<'a, str>;
 
 #[derive(Debug, Copy, Clone, Error, PartialEq, Eq)]
 pub enum DecodeError {
@@ -32,14 +32,46 @@ pub enum DecodeError {
 
 #[derive(Debug)]
 pub struct DesktopEntry<'a> {
-    pub appid: &'a str,
+    pub appid: Cow<'a, str>,
     pub groups: Groups<'a>,
-    pub path: &'a Path,
-    pub ubuntu_gettext_domain: Option<&'a str>,
+    pub path: Cow<'a, Path>,
+    pub ubuntu_gettext_domain: Option<Cow<'a, str>>,
 }
 
 impl<'a> DesktopEntry<'a> {
-    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
+    pub fn into_owned(self) -> DesktopEntry<'static> {
+
+        let mut new_groups = Groups::new();
+
+        for (group, key_map) in self.groups {
+
+            let mut new_key_map = KeyMap::new();
+            
+            for (key, (value, locale_map)) in key_map {
+
+                let mut new_locale_map = LocaleMap::new();
+
+                for (locale, value) in locale_map {
+                    new_locale_map.insert(Cow::Owned(locale.into_owned()), Cow::Owned(value.into_owned()));
+                }
+
+                new_key_map.insert(Cow::Owned(key.into_owned()), (Cow::Owned(value.into_owned()), new_locale_map));
+            }
+
+            new_groups.insert(Cow::Owned(group.into_owned()), new_key_map);
+        }
+
+        DesktopEntry {
+            appid: Cow::Owned(self.appid.into_owned()),
+            groups: new_groups,
+            ubuntu_gettext_domain: self.ubuntu_gettext_domain.map(|e| Cow::Owned(e.into_owned())),
+            path: Cow::Owned(self.path.into_owned()),
+        }
+    }
+}
+
+impl<'a> DesktopEntry<'a> {
+    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a Cow<'a, str>> {
         let group = self
             .groups
             .get(["Desktop Action ", action].concat().as_str());
@@ -57,10 +89,10 @@ impl<'a> DesktopEntry<'a> {
             .groups
             .get(["Desktop Action ", action].concat().as_str());
 
-        Self::localized_entry(self.ubuntu_gettext_domain, group, key, locale)
+        Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locale)
     }
 
-    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
+    pub fn action_exec(&'a self, action: &str) -> Option<&'a Cow<'a, str>> {
         self.action_entry(action, "Exec")
     }
 
@@ -89,7 +121,7 @@ impl<'a> DesktopEntry<'a> {
 
         let mut groups = Groups::new();
 
-        let mut active_group = "";
+        let mut active_group = Cow::Borrowed("");
 
         let mut ubuntu_gettext_domain = None;
 
@@ -103,7 +135,7 @@ impl<'a> DesktopEntry<'a> {
 
             if line_bytes[0] == b'[' {
                 if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
-                    active_group = &line[1..end + 1];
+                    active_group = Cow::Borrowed(&line[1..end + 1]);
                 }
             } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
                 let key = &line[..delimiter];
@@ -114,41 +146,41 @@ impl<'a> DesktopEntry<'a> {
                         let key_name = &key[..start];
                         let locale = &key[start + 1..key.len() - 1];
                         groups
-                            .entry(active_group)
+                            .entry(active_group.clone())
                             .or_default()
-                            .entry(key_name)
-                            .or_insert_with(|| ("", LocaleMap::new()))
+                            .entry(Cow::Borrowed(key_name))
+                            .or_insert_with(|| (Cow::Borrowed(""), LocaleMap::new()))
                             .1
-                            .insert(locale, value);
+                            .insert(Cow::Borrowed(locale), Cow::Borrowed(value));
 
                         continue;
                     }
                 }
 
                 if key == "X-Ubuntu-Gettext-Domain" {
-                    ubuntu_gettext_domain = Some(value);
+                    ubuntu_gettext_domain = Some(Cow::Borrowed(value));
                     continue;
                 }
 
                 groups
-                    .entry(active_group)
+                    .entry(active_group.clone())
                     .or_default()
-                    .entry(key)
-                    .or_insert_with(|| ("", BTreeMap::new()))
-                    .0 = value;
+                    .entry(Cow::Borrowed(key))
+                    .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
+                    .0 = Cow::Borrowed(value);
             }
         }
 
         Ok(DesktopEntry {
-            appid,
+            appid: Cow::Borrowed(appid),
             groups,
-            path,
+            path: Cow::Borrowed(path),
             ubuntu_gettext_domain,
         })
     }
 
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key)
+        Self::entry(self.groups.get("Desktop Entry"), key).and_then(|e| Some(e.as_ref()))
     }
 
     pub fn desktop_entry_localized(
@@ -157,7 +189,7 @@ impl<'a> DesktopEntry<'a> {
         locale: Option<&str>,
     ) -> Option<Cow<'a, str>> {
         Self::localized_entry(
-            self.ubuntu_gettext_domain,
+            self.ubuntu_gettext_domain.as_deref(),
             self.groups.get("Desktop Entry"),
             key,
             locale,
@@ -180,8 +212,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Icon")
     }
 
-    pub fn id(&'a self) -> &str {
-        self.appid
+    pub fn id(&'a self) -> &'a str {
+        self.appid.as_ref()
     }
 
     pub fn keywords(&'a self) -> Option<Cow<'a, str>> {
@@ -228,8 +260,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry(key).map_or(false, |v| v == "true")
     }
 
-    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
-        group.and_then(|group| group.get(key)).map(|key| key.0)
+    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a Cow<'a, str>> {
+        group.and_then(|group| group.get(key)).map(|key| &key.0)
     }
 
     fn localized_entry(
@@ -250,9 +282,8 @@ impl<'a> DesktopEntry<'a> {
                         }
                     }
                 })
-                .map(Cow::Borrowed)
-                .or_else(|| ubuntu_gettext_domain.map(|domain| Cow::Owned(dgettext(domain, key.0))))
-                .or(Some(Cow::Borrowed(key.0)))
+                .or_else(|| ubuntu_gettext_domain.map(|domain| Cow::Owned(dgettext(domain, &key.0))))
+                .or(Some(key.0.clone()))
         })
     }
 }
