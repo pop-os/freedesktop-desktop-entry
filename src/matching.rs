@@ -8,9 +8,9 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f32 {
     lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32
 }
 
-/// Return a score between 0 and 1.
-/// 1 is a perfect match.
-pub fn get_entry_score<'a, Q, L>(query: Q, entry: &'a DesktopEntry<'a>, locales: &[L]) -> f32
+/// The returned value is between 0.0 and 1.0 (higher value means more similar).
+/// You can use the `additional_values` parameter to add runtime string.
+pub fn get_entry_score<'a, Q, L>(query: Q, entry: &'a DesktopEntry<'a>, locales: &[L], additional_values: &'a [&'a str]) -> f32
 where
     Q: AsRef<str>,
     L: AsRef<str>,
@@ -20,9 +20,12 @@ where
 
     // todo: cache all this ?
 
-    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords"];
+    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords", "Exec"];
+    let fields_not_translatable = ["Exec", "StartupWMClass"];
 
     let mut normalized_values: Vec<String> = Vec::new();
+
+    normalized_values.extend(additional_values.iter().map(|val| val.to_lowercase()));
 
     let de_id = entry.appid.to_lowercase();
     let de_wm_class = entry.startup_wm_class().unwrap_or_default().to_lowercase();
@@ -40,6 +43,15 @@ where
             ) {
                 normalized_values.push(e.to_lowercase());
             }
+        }
+    }
+
+    for field in fields_not_translatable {
+        if let Some(e) = DesktopEntry::entry(
+            entry.groups.get("Desktop Entry"),
+            field,
+        ) {
+            normalized_values.push(e.to_lowercase());
         }
     }
 
