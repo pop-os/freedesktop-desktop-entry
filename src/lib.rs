@@ -3,12 +3,13 @@
 
 mod decoder;
 mod iter;
-mod matching;
+
+#[cfg(feature = "matching")]
+pub mod matching;
 
 #[cfg(test)]
 mod test;
 
-pub use matching::{get_best_match, get_entry_score, MatchAppIdOptions};
 
 pub use self::iter::Iter;
 use std::borrow::Cow;
