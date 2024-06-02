@@ -57,8 +57,9 @@ impl Default for MatchAppIdOptions {
     }
 }
 
+// todo: use rayon
 /// Try to guess the best [`DesktopEntry`] match for a query.
-pub fn try_match_app_id<'a, 'l, I>(
+pub fn try_match_entries<'a, 'l, I>(
     query: I,
     entries: &'a [DesktopEntry<'a>],
     options: MatchAppIdOptions,

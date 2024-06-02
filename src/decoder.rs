@@ -52,6 +52,18 @@ impl<'a> DesktopEntry<'a> {
         })
     }
 
+    pub fn decode_from_paths<'i, 'l: 'i, L>(
+        paths: impl Iterator<Item = PathBuf> + 'i,
+        locales: &'l [L],
+    ) -> impl Iterator<Item = Result<DesktopEntry<'static>, DecodeError>> + 'i
+    where
+        L: AsRef<str>,
+    {
+        let mut buf = String::new();
+
+        paths.map(move |path| decode_from_path_with_buf(path, locales, &mut buf))
+    }
+
     /// Return an owned [`DesktopEntry`]
     pub fn decode_from_path<L>(
         path: PathBuf,
@@ -60,34 +72,8 @@ impl<'a> DesktopEntry<'a> {
     where
         L: AsRef<str>,
     {
-        let file = File::open(&path)?;
-
-        let appid = get_app_id(&path)?;
-
-        let mut groups = Groups::new();
-        let mut active_group = Cow::Borrowed("");
-        let mut ubuntu_gettext_domain = None;
-
-        let mut reader = io::BufReader::new(file);
         let mut buf = String::new();
-
-        while reader.read_line(&mut buf)? != 0 {
-            process_line(
-                &buf,
-                &mut groups,
-                &mut active_group,
-                &mut ubuntu_gettext_domain,
-                locales,
-                |s| Cow::Owned(s.to_owned()),
-            )
-        }
-
-        Ok(DesktopEntry {
-            appid: Cow::Owned(appid.to_owned()),
-            groups,
-            path: Cow::Owned(path),
-            ubuntu_gettext_domain,
-        })
+        decode_from_path_with_buf(path, locales, &mut buf)
     }
 }
 
@@ -102,15 +88,15 @@ fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<&str, DecodeError> {
 }
 
 #[inline]
-fn process_line<'a, 'b, 'c: 'b + 'a, F, L>(
-    line: &'a str,
-    groups: &'b mut Groups<'c>,
-    active_group: &'b mut Cow<'c, str>,
-    ubuntu_gettext_domain: &'b mut Option<Cow<'c, str>>,
+fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
+    line: &'buf str,
+    groups: &'local_ref mut Groups<'res>,
+    active_group: &'local_ref mut Cow<'res, str>,
+    ubuntu_gettext_domain: &'local_ref mut Option<Cow<'res, str>>,
     locales_filter: &[L],
     convert_to_cow: F,
 ) where
-    F: Fn(&'a str) -> Cow<'c, str>,
+    F: Fn(&'buf str) -> Cow<'res, str>,
     L: AsRef<str>,
 {
     let line = line.trim();
@@ -162,4 +148,42 @@ fn process_line<'a, 'b, 'c: 'b + 'a, F, L>(
             .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
             .0 = convert_to_cow(value);
     }
+}
+
+#[inline]
+fn decode_from_path_with_buf<L>(
+    path: PathBuf,
+    locales: &[L],
+    buf: &mut String,
+) -> Result<DesktopEntry<'static>, DecodeError>
+where
+    L: AsRef<str>,
+{
+    let file = File::open(&path)?;
+
+    let appid = get_app_id(&path)?;
+
+    let mut groups = Groups::new();
+    let mut active_group = Cow::Borrowed("");
+    let mut ubuntu_gettext_domain = None;
+
+    let mut reader = io::BufReader::new(file);
+
+    while reader.read_line(buf)? != 0 {
+        process_line(
+            buf,
+            &mut groups,
+            &mut active_group,
+            &mut ubuntu_gettext_domain,
+            locales,
+            |s| Cow::Owned(s.to_owned()),
+        )
+    }
+
+    Ok(DesktopEntry {
+        appid: Cow::Owned(appid.to_owned()),
+        groups,
+        path: Cow::Owned(path),
+        ubuntu_gettext_domain,
+    })
 }
