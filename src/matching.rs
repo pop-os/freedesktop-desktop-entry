@@ -2,9 +2,16 @@ use std::cmp::max;
 
 use crate::DesktopEntry;
 
+fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f32 {
+    let lcsstr = textdistance::str::lcsstr(pattern, de_value);
+    let res = lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32;
+    res
+}
+
+
 /// From 0 to 1.
 /// 1 is a perfect match.
-fn match_entry_(query: &str, de: &DesktopEntry, _languages: &[&str]) -> f32 {
+fn match_entry_(query: &str, de: &DesktopEntry, languages: &[&str]) -> f32 {
     let cmp = |query, de| {
         let lcsstr = textdistance::str::lcsstr(query, de);
         lcsstr as f32 / (max(query.len(), de.len())) as f32
@@ -34,6 +41,39 @@ fn match_entry_(query: &str, de: &DesktopEntry, _languages: &[&str]) -> f32 {
         cmp(query, &de_id),
         max_f32(cmp(query, &de_wm_class), cmp(query, &de_name)),
     )
+}
+
+
+
+/// Return a score between 0 and 1.
+/// 1 is a perfect match.
+pub fn get_entry_score<'a, 'l, I>(
+    query: I,
+    entry: &'a DesktopEntry<'a>,
+    languages: &'l [&'l str],
+) -> f32
+where
+    I: AsRef<str>,
+{
+    todo!()
+}
+
+
+
+
+/// From 0 to 1.
+/// 1 is a perfect match.
+fn match_entry_not_user(pattern: &str, de: &DesktopEntry) -> f32 {
+    let de_id = de.appid.to_lowercase();
+    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
+    let de_name = de.name(None).unwrap_or_default().to_lowercase();
+
+    [de_id, de_wm_class, de_name]
+        .map(|de| compare_str(pattern, &de))
+        .iter()
+        .max_by(|e1, e2| e1.total_cmp(e2))
+        .unwrap_or(&0.0)
+        .clone()
 }
 
 pub struct MatchAppIdOptions {
@@ -68,41 +108,20 @@ pub fn get_best_match<'a, 'l, I>(
 where
     I: AsRef<str>,
 {
-    todo!()
-}
-
-/// Return a score between 0 and 1
-pub fn get_entry_score<'a, 'l, I>(
-    query: I,
-    entry: &'a DesktopEntry<'a>,
-    languages: &'l [&'l str],
-) -> f32
-where
-    I: AsRef<str>,
-{
-    todo!()
-}
-
-
-
-// todo: use rayon
-/// Try to guess the best [`DesktopEntry`] match for a query.
-fn try_match_entries<'a, 'l, I>(
-    query: I,
-    entries: &'a [DesktopEntry<'a>],
-    options: MatchAppIdOptions,
-    languages: &'l [&'l str],
-) -> Option<&'a DesktopEntry<'a>>
-where
-    I: AsRef<str>,
-{
     let mut max_score = None;
     let mut second_max_score = 0.;
 
-    let normalized_query = query.as_ref().to_lowercase();
+    let normalized_patterns = patterns
+        .iter()
+        .map(|e| e.as_ref().to_lowercase())
+        .collect::<Vec<_>>();
 
     for de in entries {
-        let score = match_entry_(&normalized_query, de, languages);
+        let score = normalized_patterns
+            .iter()
+            .map(|p| match_entry_not_user(p, de))
+            .max_by(|e1, e2| e1.total_cmp(e2))
+            .unwrap_or(0.0);
 
         match max_score {
             Some((prev_max_score, _)) => {
