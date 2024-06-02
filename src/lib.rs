@@ -233,6 +233,7 @@ impl<'a> Display for DesktopEntry<'a> {
                     let _ = writeln!(formatter, "{}[{}]={}", key, locale, localized);
                 }
             }
+            writeln!(formatter)?;
         }
 
         Ok(())
@@ -304,4 +305,22 @@ fn dgettext(domain: &str, message: &str) -> String {
     use gettextrs::{setlocale, LocaleCategory};
     setlocale(LocaleCategory::LcAll, "");
     gettextrs::dgettext(domain, message)
+}
+
+/// Get the configured user language env variables.
+/// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
+pub fn get_languages_from_env() -> Vec<String> {
+    let mut l = Vec::new();
+
+    if let Ok(lang) = std::env::var("LANG") {
+        l.push(lang);
+    }
+
+    if let Ok(lang) = std::env::var("LANGUAGES") {
+        lang.split(':').for_each(|e| {
+            l.push(e.to_owned());
+        })
+    }
+
+    l
 }

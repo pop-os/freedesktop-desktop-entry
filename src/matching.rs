@@ -2,6 +2,40 @@ use std::cmp::max;
 
 use crate::DesktopEntry;
 
+/// From 0 to 1.
+/// 1 is a perfect match.
+fn match_entry(query: &str, de: &DesktopEntry, _languages: &[&str]) -> f32 {
+    let cmp = |query, de| {
+        let lcsstr = textdistance::str::lcsstr(query, de);
+        lcsstr as f32 / (max(query.len(), de.len())) as f32
+    };
+
+    fn max_f32(a: f32, b: f32) -> f32 {
+        if a > b {
+            a
+        } else {
+            b
+        }
+    }
+
+    // should search in
+    // - id
+    // - name
+    // - coment
+    // - generic name
+    // - keyword
+    // - categories
+    // - wm_class
+    let de_id = de.appid.to_lowercase();
+    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
+    let de_name = de.name(None).unwrap_or_default().to_lowercase();
+
+    max_f32(
+        cmp(query, &de_id),
+        max_f32(cmp(query, &de_wm_class), cmp(query, &de_name)),
+    )
+}
+
 pub struct MatchAppIdOptions {
     /// Minimal score required to validate a match.
     /// Must be between 0 and 1
@@ -23,20 +57,23 @@ impl Default for MatchAppIdOptions {
     }
 }
 
-/// Try to guess the best [`DesktopEntry`] match for the app id.
-pub fn try_match_app_id<'a, 'b, I>(
-    app_id: I,
-    entries: &'b [DesktopEntry<'a>],
+/// Try to guess the best [`DesktopEntry`] match for a query.
+pub fn try_match_app_id<'a, 'l, I>(
+    query: I,
+    entries: &'a [DesktopEntry<'a>],
     options: MatchAppIdOptions,
-) -> Option<&'b DesktopEntry<'a>>
+    languages: &'l [&'l str],
+) -> Option<&'a DesktopEntry<'a>>
 where
     I: AsRef<str>,
 {
     let mut max_score = None;
     let mut second_max_score = 0.;
 
+    let normalized_query = query.as_ref().to_lowercase();
+
     for de in entries {
-        let score = match_entry(app_id.as_ref(), de);
+        let score = match_entry(&normalized_query, de, languages);
 
         match max_score {
             Some((prev_max_score, _)) => {
@@ -72,31 +109,4 @@ where
     } else {
         None
     }
-}
-
-/// From 0 to 1.
-/// 1 is a perfect match.
-fn match_entry(id: &str, de: &DesktopEntry) -> f32 {
-    let cmp = |id, de| {
-        let lcsstr = textdistance::str::lcsstr(id, de);
-        lcsstr as f32 / (max(id.len(), de.len())) as f32
-    };
-
-    fn max_f32(a: f32, b: f32) -> f32 {
-        if a > b {
-            a
-        } else {
-            b
-        }
-    }
-
-    let id = id.to_lowercase();
-    let de_id = de.appid.to_lowercase();
-    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
-    let de_name = de.name(None).unwrap_or_default().to_lowercase();
-
-    max_f32(
-        cmp(&id, &de_id),
-        max_f32(cmp(&id, &de_wm_class), cmp(&id, &de_name)),
-    )
 }

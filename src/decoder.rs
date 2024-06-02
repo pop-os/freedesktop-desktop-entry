@@ -19,10 +19,14 @@ pub enum DecodeError {
 }
 
 impl<'a> DesktopEntry<'a> {
-    pub fn decode_from_str(
+    pub fn decode_from_str<L>(
         path: &'a Path,
         input: &'a str,
-    ) -> Result<DesktopEntry<'a>, DecodeError> {
+        locales: &[L],
+    ) -> Result<DesktopEntry<'a>, DecodeError>
+    where
+        L: AsRef<str>,
+    {
         let appid = get_app_id(path)?;
 
         let mut groups = Groups::new();
@@ -35,6 +39,7 @@ impl<'a> DesktopEntry<'a> {
                 &mut groups,
                 &mut active_group,
                 &mut ubuntu_gettext_domain,
+                locales,
                 Cow::Borrowed,
             )
         }
@@ -48,7 +53,13 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return an owned [`DesktopEntry`]
-    pub fn decode_from_path<R>(path: PathBuf) -> Result<DesktopEntry<'static>, DecodeError> {
+    pub fn decode_from_path<L>(
+        path: PathBuf,
+        locales: &[L],
+    ) -> Result<DesktopEntry<'static>, DecodeError>
+    where
+        L: AsRef<str>,
+    {
         let file = File::open(&path)?;
 
         let appid = get_app_id(&path)?;
@@ -66,6 +77,7 @@ impl<'a> DesktopEntry<'a> {
                 &mut groups,
                 &mut active_group,
                 &mut ubuntu_gettext_domain,
+                locales,
                 |s| Cow::Owned(s.to_owned()),
             )
         }
@@ -90,14 +102,16 @@ fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<&str, DecodeError> {
 }
 
 #[inline]
-fn process_line<'a, 'b, 'c: 'b + 'a, F>(
+fn process_line<'a, 'b, 'c: 'b + 'a, F, L>(
     line: &'a str,
     groups: &'b mut Groups<'c>,
     active_group: &'b mut Cow<'c, str>,
     ubuntu_gettext_domain: &'b mut Option<Cow<'c, str>>,
+    locales_filter: &[L],
     convert_to_cow: F,
 ) where
     F: Fn(&'a str) -> Cow<'c, str>,
+    L: AsRef<str>,
 {
     let line = line.trim();
     if line.is_empty() || line.starts_with('#') {
@@ -114,10 +128,16 @@ fn process_line<'a, 'b, 'c: 'b + 'a, F>(
         let key = &line[..delimiter];
         let value = &line[delimiter + 1..];
 
+        // if locale
         if key.as_bytes()[key.len() - 1] == b']' {
             if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
                 let key_name = &key[..start];
                 let locale = &key[start + 1..key.len() - 1];
+
+                if !locales_filter.iter().any(|l| l.as_ref() == locale) {
+                    return;
+                }
+
                 groups
                     .entry(active_group.clone())
                     .or_default()
