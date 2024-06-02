@@ -177,7 +177,8 @@ where
             &mut ubuntu_gettext_domain,
             locales,
             |s| Cow::Owned(s.to_owned()),
-        )
+        );
+        buf.clear();
     }
 
     Ok(DesktopEntry {

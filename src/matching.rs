@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::{borrow::Cow, cmp::max};
 
 use crate::DesktopEntry;
 
@@ -7,7 +7,6 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f32 {
     let res = lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32;
     res
 }
-
 
 /// From 0 to 1.
 /// 1 is a perfect match.
@@ -25,14 +24,35 @@ fn match_entry_(query: &str, de: &DesktopEntry, languages: &[&str]) -> f32 {
         }
     }
 
-    // should search in
-    // - id
-    // - name
-    // - coment
-    // - generic name
-    // - keyword
-    // - categories
-    // - wm_class
+    // todo: cache all this ?
+
+    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords"];
+
+    let mut v: Vec<Cow<str>> = Vec::new();
+
+    let de_id = de.appid.to_lowercase();
+    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
+
+    v.push(Cow::Owned(de_id));
+    v.push(Cow::Owned(de_wm_class));
+
+    for l in languages {
+        for field in fields {
+            if let Some(e) = DesktopEntry::localized_entry(None, de.groups.get(field), field, Some(l)) {
+                v.push(e.clone());
+            }
+        }
+    }
+
+    if let Some(gettext) = &de.ubuntu_gettext_domain {
+        for field in fields {
+            if let Some(e) = DesktopEntry::localized_entry(Some(&gettext), de.groups.get(field), field, None) {
+                v.push(e.clone());
+            }
+        }
+    }
+    
+
     let de_id = de.appid.to_lowercase();
     let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
     let de_name = de.name(None).unwrap_or_default().to_lowercase();
@@ -42,8 +62,6 @@ fn match_entry_(query: &str, de: &DesktopEntry, languages: &[&str]) -> f32 {
         max_f32(cmp(query, &de_wm_class), cmp(query, &de_name)),
     )
 }
-
-
 
 /// Return a score between 0 and 1.
 /// 1 is a perfect match.
@@ -57,9 +75,6 @@ where
 {
     todo!()
 }
-
-
-
 
 /// From 0 to 1.
 /// 1 is a perfect match.
