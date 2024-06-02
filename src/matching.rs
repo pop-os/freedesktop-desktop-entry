@@ -2,15 +2,14 @@ use std::cmp::max;
 
 use crate::DesktopEntry;
 
-fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f32 {
-    let lcsstr = textdistance::str::lcsstr(pattern, de_value);
-
-    lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32
-}
-
 /// The returned value is between 0.0 and 1.0 (higher value means more similar).
 /// You can use the `additional_values` parameter to add runtime string.
-pub fn get_entry_score<'a, Q, L>(query: Q, entry: &'a DesktopEntry<'a>, locales: &[L], additional_values: &'a [&'a str]) -> f32
+pub fn get_entry_score<'a, Q, L>(
+    query: Q,
+    entry: &'a DesktopEntry<'a>,
+    locales: &[L],
+    additional_values: &'a [&'a str],
+) -> f64
 where
     Q: AsRef<str>,
     L: AsRef<str>,
@@ -20,7 +19,14 @@ where
 
     // todo: cache all this ?
 
-    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords", "Exec"];
+    let fields = [
+        "Name",
+        "GenericName",
+        "Comment",
+        "Categories",
+        "Keywords",
+        "Exec",
+    ];
     let fields_not_translatable = ["Exec", "StartupWMClass"];
 
     let mut normalized_values: Vec<String> = Vec::new();
@@ -47,10 +53,7 @@ where
     }
 
     for field in fields_not_translatable {
-        if let Some(e) = DesktopEntry::entry(
-            entry.groups.get("Desktop Entry"),
-            field,
-        ) {
+        if let Some(e) = DesktopEntry::entry(entry.groups.get("Desktop Entry"), field) {
             normalized_values.push(e.to_lowercase());
         }
     }
@@ -70,14 +73,20 @@ where
 
     normalized_values
         .into_iter()
-        .map(|de| compare_str(&query, &de))
+        .map(|de| strsim::jaro_winkler(&query, &de))
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(0.0)
 }
 
+fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
+    let lcsstr = textdistance::str::lcsstr(pattern, de_value);
+
+    lcsstr as f64 / (max(pattern.len(), de_value.len())) as f64
+}
+
 /// From 0 to 1.
 /// 1 is a perfect match.
-fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f32 {
+fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     let de_id = de.appid.to_lowercase();
     let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
     let de_name = de.name(None).unwrap_or_default().to_lowercase();
@@ -93,13 +102,13 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f32 {
 pub struct MatchAppIdOptions {
     /// Minimal score required to validate a match.
     /// Must be between 0 and 1
-    pub min_score: f32,
+    pub min_score: f64,
     /// Optional field to lower the minimal score required to match
     /// if the entropy is at a certain value, e.i if the two best matches
     /// hare very different.
     /// - First element - minimal entropy, between 0 and 1
     /// - Second element - minimal score, between 0 and 1
-    pub entropy: Option<(f32, f32)>,
+    pub entropy: Option<(f64, f64)>,
 }
 
 impl Default for MatchAppIdOptions {

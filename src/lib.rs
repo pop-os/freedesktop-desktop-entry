@@ -10,7 +10,6 @@ pub mod matching;
 #[cfg(test)]
 mod test;
 
-
 pub use self::iter::Iter;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -311,20 +310,40 @@ fn dgettext(domain: &str, message: &str) -> String {
     gettextrs::dgettext(domain, message)
 }
 
+// todo: support more variable syntax like fr_FR.
+// This will require some work in decode and values query
+// for now, just remove the _* part, cause it seems more common
+
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
 pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
-    if let Ok(lang) = std::env::var("LANG") {
-        l.push(lang);
+    if let Ok(mut lang) = std::env::var("LANG") {
+        if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
+            lang.truncate(start);
+            l.push(lang)
+        } else {
+            l.push(lang);
+        }
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
-        lang.split(':').for_each(|e| {
-            l.push(e.to_owned());
+        lang.split(':').for_each(|lang| {
+            if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
+                l.push(lang.split_at(start).0.to_owned())
+            } else {
+                l.push(lang.to_owned());
+            }
         })
     }
 
     l
+}
+
+#[test]
+fn locales_env_test() {
+    let s = get_languages_from_env();
+
+    println!("{:?}", s);
 }
