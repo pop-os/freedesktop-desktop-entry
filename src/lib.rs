@@ -1,9 +1,7 @@
 // Copyright 2021 System76 <info@system76.com>
 // SPDX-License-Identifier: MPL-2.0
 
-#[macro_use]
-extern crate thiserror;
-
+mod decoder;
 mod iter;
 mod matching;
 
@@ -24,12 +22,6 @@ pub type Locale<'a> = Cow<'a, str>;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = Cow<'a, str>;
 
-#[derive(Debug, Copy, Clone, Error, PartialEq, Eq)]
-pub enum DecodeError {
-    #[error("path does not contain a valid app ID")]
-    AppID,
-}
-
 #[derive(Debug)]
 pub struct DesktopEntry<'a> {
     pub appid: Cow<'a, str>,
@@ -40,22 +32,25 @@ pub struct DesktopEntry<'a> {
 
 impl<'a> DesktopEntry<'a> {
     pub fn into_owned(self) -> DesktopEntry<'static> {
-
         let mut new_groups = Groups::new();
 
         for (group, key_map) in self.groups {
-
             let mut new_key_map = KeyMap::new();
-            
-            for (key, (value, locale_map)) in key_map {
 
+            for (key, (value, locale_map)) in key_map {
                 let mut new_locale_map = LocaleMap::new();
 
                 for (locale, value) in locale_map {
-                    new_locale_map.insert(Cow::Owned(locale.into_owned()), Cow::Owned(value.into_owned()));
+                    new_locale_map.insert(
+                        Cow::Owned(locale.into_owned()),
+                        Cow::Owned(value.into_owned()),
+                    );
                 }
 
-                new_key_map.insert(Cow::Owned(key.into_owned()), (Cow::Owned(value.into_owned()), new_locale_map));
+                new_key_map.insert(
+                    Cow::Owned(key.into_owned()),
+                    (Cow::Owned(value.into_owned()), new_locale_map),
+                );
             }
 
             new_groups.insert(Cow::Owned(group.into_owned()), new_key_map);
@@ -64,7 +59,9 @@ impl<'a> DesktopEntry<'a> {
         DesktopEntry {
             appid: Cow::Owned(self.appid.into_owned()),
             groups: new_groups,
-            ubuntu_gettext_domain: self.ubuntu_gettext_domain.map(|e| Cow::Owned(e.into_owned())),
+            ubuntu_gettext_domain: self
+                .ubuntu_gettext_domain
+                .map(|e| Cow::Owned(e.into_owned())),
             path: Cow::Owned(self.path.into_owned()),
         }
     }
@@ -112,75 +109,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry_localized("Comment", locale)
     }
 
-    pub fn decode(path: &'a Path, input: &'a str) -> Result<DesktopEntry<'a>, DecodeError> {
-        let appid = path
-            .file_stem()
-            .ok_or(DecodeError::AppID)?
-            .to_str()
-            .ok_or(DecodeError::AppID)?;
-
-        let mut groups = Groups::new();
-
-        let mut active_group = Cow::Borrowed("");
-
-        let mut ubuntu_gettext_domain = None;
-
-        for mut line in input.lines() {
-            line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            let line_bytes = line.as_bytes();
-
-            if line_bytes[0] == b'[' {
-                if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
-                    active_group = Cow::Borrowed(&line[1..end + 1]);
-                }
-            } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
-                let key = &line[..delimiter];
-                let value = &line[delimiter + 1..];
-
-                if key.as_bytes()[key.len() - 1] == b']' {
-                    if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
-                        let key_name = &key[..start];
-                        let locale = &key[start + 1..key.len() - 1];
-                        groups
-                            .entry(active_group.clone())
-                            .or_default()
-                            .entry(Cow::Borrowed(key_name))
-                            .or_insert_with(|| (Cow::Borrowed(""), LocaleMap::new()))
-                            .1
-                            .insert(Cow::Borrowed(locale), Cow::Borrowed(value));
-
-                        continue;
-                    }
-                }
-
-                if key == "X-Ubuntu-Gettext-Domain" {
-                    ubuntu_gettext_domain = Some(Cow::Borrowed(value));
-                    continue;
-                }
-
-                groups
-                    .entry(active_group.clone())
-                    .or_default()
-                    .entry(Cow::Borrowed(key))
-                    .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
-                    .0 = Cow::Borrowed(value);
-            }
-        }
-
-        Ok(DesktopEntry {
-            appid: Cow::Borrowed(appid),
-            groups,
-            path: Cow::Borrowed(path),
-            ubuntu_gettext_domain,
-        })
-    }
-
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key).and_then(|e| Some(e.as_ref()))
+        Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
     }
 
     pub fn desktop_entry_localized(
@@ -282,7 +212,9 @@ impl<'a> DesktopEntry<'a> {
                         }
                     }
                 })
-                .or_else(|| ubuntu_gettext_domain.map(|domain| Cow::Owned(dgettext(domain, &key.0))))
+                .or_else(|| {
+                    ubuntu_gettext_domain.map(|domain| Cow::Owned(dgettext(domain, &key.0)))
+                })
                 .or(Some(key.0.clone()))
         })
     }
