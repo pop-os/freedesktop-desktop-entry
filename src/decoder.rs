@@ -23,62 +23,20 @@ impl<'a> DesktopEntry<'a> {
         path: &'a Path,
         input: &'a str,
     ) -> Result<DesktopEntry<'a>, DecodeError> {
-        let appid = path
-            .file_stem()
-            .ok_or(DecodeError::AppID)?
-            .to_str()
-            .ok_or(DecodeError::AppID)?;
+        let appid = get_app_id(path)?;
 
         let mut groups = Groups::new();
-
         let mut active_group = Cow::Borrowed("");
-
         let mut ubuntu_gettext_domain = None;
 
-        for mut line in input.lines() {
-            line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            let line_bytes = line.as_bytes();
-
-            if line_bytes[0] == b'[' {
-                if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
-                    active_group = Cow::Borrowed(&line[1..end + 1]);
-                }
-            } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
-                let key = &line[..delimiter];
-                let value = &line[delimiter + 1..];
-
-                if key.as_bytes()[key.len() - 1] == b']' {
-                    if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
-                        let key_name = &key[..start];
-                        let locale = &key[start + 1..key.len() - 1];
-                        groups
-                            .entry(active_group.clone())
-                            .or_default()
-                            .entry(Cow::Borrowed(key_name))
-                            .or_insert_with(|| (Cow::Borrowed(""), LocaleMap::new()))
-                            .1
-                            .insert(Cow::Borrowed(locale), Cow::Borrowed(value));
-
-                        continue;
-                    }
-                }
-
-                if key == "X-Ubuntu-Gettext-Domain" {
-                    ubuntu_gettext_domain = Some(Cow::Borrowed(value));
-                    continue;
-                }
-
-                groups
-                    .entry(active_group.clone())
-                    .or_default()
-                    .entry(Cow::Borrowed(key))
-                    .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
-                    .0 = Cow::Borrowed(value);
-            }
+        for line in input.lines() {
+            process_line(
+                line,
+                &mut groups,
+                &mut active_group,
+                &mut ubuntu_gettext_domain,
+                Cow::Borrowed,
+            )
         }
 
         Ok(DesktopEntry {
@@ -93,11 +51,7 @@ impl<'a> DesktopEntry<'a> {
     pub fn decode_from_path<R>(path: PathBuf) -> Result<DesktopEntry<'static>, DecodeError> {
         let file = File::open(&path)?;
 
-        let appid = path
-            .file_stem()
-            .ok_or(DecodeError::AppID)?
-            .to_str()
-            .ok_or(DecodeError::AppID)?;
+        let appid = get_app_id(&path)?;
 
         let mut groups = Groups::new();
         let mut active_group = Cow::Borrowed("");
@@ -107,11 +61,12 @@ impl<'a> DesktopEntry<'a> {
         let mut buf = String::new();
 
         while reader.read_line(&mut buf)? != 0 {
-            process(
+            process_line(
                 &buf,
                 &mut groups,
                 &mut active_group,
                 &mut ubuntu_gettext_domain,
+                |s| Cow::Owned(s.to_owned()),
             )
         }
 
@@ -124,13 +79,26 @@ impl<'a> DesktopEntry<'a> {
     }
 }
 
+fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<&str, DecodeError> {
+    let appid = path
+        .as_ref()
+        .file_stem()
+        .ok_or(DecodeError::AppID)?
+        .to_str()
+        .ok_or(DecodeError::AppID)?;
+    Ok(appid)
+}
+
 #[inline]
-fn process<'a, 'b, 'c: 'b>(
+fn process_line<'a, 'b, 'c: 'b + 'a, F>(
     line: &'a str,
     groups: &'b mut Groups<'c>,
     active_group: &'b mut Cow<'c, str>,
     ubuntu_gettext_domain: &'b mut Option<Cow<'c, str>>,
-) {
+    convert_to_cow: F,
+) where
+    F: Fn(&'a str) -> Cow<'c, str>,
+{
     let line = line.trim();
     if line.is_empty() || line.starts_with('#') {
         return;
@@ -140,7 +108,7 @@ fn process<'a, 'b, 'c: 'b>(
 
     if line_bytes[0] == b'[' {
         if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
-            *active_group = Cow::Owned(line[1..end + 1].to_owned());
+            *active_group = convert_to_cow(&line[1..end + 1]);
         }
     } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
         let key = &line[..delimiter];
@@ -153,25 +121,25 @@ fn process<'a, 'b, 'c: 'b>(
                 groups
                     .entry(active_group.clone())
                     .or_default()
-                    .entry(Cow::Owned(key_name.to_owned()))
+                    .entry(convert_to_cow(key_name))
                     .or_insert_with(|| (Cow::Borrowed(""), LocaleMap::new()))
                     .1
-                    .insert(Cow::Owned(locale.to_owned()), Cow::Owned(value.to_owned()));
+                    .insert(convert_to_cow(locale), convert_to_cow(value));
 
                 return;
             }
         }
 
         if key == "X-Ubuntu-Gettext-Domain" {
-            *ubuntu_gettext_domain = Some(Cow::Owned(value.to_owned()));
+            *ubuntu_gettext_domain = Some(convert_to_cow(value));
             return;
         }
 
         groups
             .entry(active_group.clone())
             .or_default()
-            .entry(Cow::Owned(key.to_owned()))
+            .entry(convert_to_cow(key))
             .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
-            .0 = Cow::Owned(value.to_owned());
+            .0 = convert_to_cow(value);
     }
 }
