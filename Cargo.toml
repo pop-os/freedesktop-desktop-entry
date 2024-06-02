@@ -2,14 +2,13 @@
 name = "freedesktop-desktop-entry"
 version = "0.5.2"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
-edition = "2018"
+edition = "2021"
 homepage = "https://github.com/pop-os/freedesktop-desktop-entry"
 description = "Freedesktop Desktop Entry Specification"
 license = "MPL-2.0"
 readme = "README.md"
 categories = [ "os::unix-apis" ]
 keywords = [ "freedesktop", "desktop", "entry" ]
-maintenance = { status = "passively-maintained" }
 
 [dependencies]
 dirs = "3"

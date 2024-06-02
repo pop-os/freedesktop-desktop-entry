@@ -64,7 +64,7 @@ fn bench_owned_optimized(it: u32) {
 
         let now = Instant::now();
 
-        let de = DesktopEntry::decode_from_paths(paths, &locale)
+        let _ = DesktopEntry::decode_from_paths(paths, &locale)
             .filter_map(|e| e.ok())
             .collect::<Vec<_>>();
 

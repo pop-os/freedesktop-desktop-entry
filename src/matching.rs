@@ -1,96 +1,83 @@
-use std::{borrow::Cow, cmp::max};
+use std::cmp::max;
 
 use crate::DesktopEntry;
 
 fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f32 {
     let lcsstr = textdistance::str::lcsstr(pattern, de_value);
-    let res = lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32;
-    res
+
+    lcsstr as f32 / (max(pattern.len(), de_value.len())) as f32
 }
 
-/// From 0 to 1.
+/// Return a score between 0 and 1.
 /// 1 is a perfect match.
-fn match_entry_(query: &str, de: &DesktopEntry, languages: &[&str]) -> f32 {
-    let cmp = |query, de| {
-        let lcsstr = textdistance::str::lcsstr(query, de);
-        lcsstr as f32 / (max(query.len(), de.len())) as f32
-    };
-
-    fn max_f32(a: f32, b: f32) -> f32 {
-        if a > b {
-            a
-        } else {
-            b
-        }
-    }
+pub fn get_entry_score<'a, Q, L>(query: Q, entry: &'a DesktopEntry<'a>, locales: &[L]) -> f32
+where
+    Q: AsRef<str>,
+    L: AsRef<str>,
+{
+    // let the user do this ?
+    let query = query.as_ref().to_lowercase();
 
     // todo: cache all this ?
 
     let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords"];
 
-    let mut v: Vec<Cow<str>> = Vec::new();
+    let mut normalized_values: Vec<String> = Vec::new();
 
-    let de_id = de.appid.to_lowercase();
-    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
+    let de_id = entry.appid.to_lowercase();
+    let de_wm_class = entry.startup_wm_class().unwrap_or_default().to_lowercase();
 
-    v.push(Cow::Owned(de_id));
-    v.push(Cow::Owned(de_wm_class));
+    normalized_values.push(de_id);
+    normalized_values.push(de_wm_class);
 
-    for l in languages {
+    for l in locales {
         for field in fields {
-            if let Some(e) = DesktopEntry::localized_entry(None, de.groups.get(field), field, Some(l)) {
-                v.push(e.clone());
+            if let Some(e) = DesktopEntry::localized_entry(
+                None,
+                entry.groups.get("Desktop Entry"),
+                field,
+                Some(l.as_ref()),
+            ) {
+                normalized_values.push(e.to_lowercase());
             }
         }
     }
 
-    if let Some(gettext) = &de.ubuntu_gettext_domain {
+    if let Some(gettext) = &entry.ubuntu_gettext_domain {
         for field in fields {
-            if let Some(e) = DesktopEntry::localized_entry(Some(&gettext), de.groups.get(field), field, None) {
-                v.push(e.clone());
+            if let Some(e) = DesktopEntry::localized_entry(
+                Some(gettext),
+                entry.groups.get("Desktop Entry"),
+                field,
+                None,
+            ) {
+                normalized_values.push(e.to_lowercase());
             }
         }
     }
-    
 
-    let de_id = de.appid.to_lowercase();
-    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
-    let de_name = de.name(None).unwrap_or_default().to_lowercase();
-
-    max_f32(
-        cmp(query, &de_id),
-        max_f32(cmp(query, &de_wm_class), cmp(query, &de_name)),
-    )
-}
-
-/// Return a score between 0 and 1.
-/// 1 is a perfect match.
-pub fn get_entry_score<'a, 'l, I>(
-    query: I,
-    entry: &'a DesktopEntry<'a>,
-    languages: &'l [&'l str],
-) -> f32
-where
-    I: AsRef<str>,
-{
-    todo!()
+    normalized_values
+        .into_iter()
+        .map(|de| compare_str(&query, &de))
+        .max_by(|e1, e2| e1.total_cmp(e2))
+        .unwrap_or(0.0)
 }
 
 /// From 0 to 1.
 /// 1 is a perfect match.
-fn match_entry_not_user(pattern: &str, de: &DesktopEntry) -> f32 {
+fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f32 {
     let de_id = de.appid.to_lowercase();
     let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
     let de_name = de.name(None).unwrap_or_default().to_lowercase();
 
-    [de_id, de_wm_class, de_name]
+    *[de_id, de_wm_class, de_name]
         .map(|de| compare_str(pattern, &de))
         .iter()
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(&0.0)
-        .clone()
 }
 
+#[derive(Debug, Clone)]
 pub struct MatchAppIdOptions {
     /// Minimal score required to validate a match.
     /// Must be between 0 and 1
@@ -113,10 +100,9 @@ impl Default for MatchAppIdOptions {
 }
 
 /// Return the best match over all provided [`DesktopEntry`].
-/// Use this to match over the values provided by the compositor,
-/// not the user.
-pub fn get_best_match<'a, 'l, I>(
-    patterns: &'a [I],
+/// Use this to match over the values provided by the compositor, not the user.
+pub fn get_best_match<'a, I>(
+    patterns: &[I],
     entries: &'a [DesktopEntry<'a>],
     options: MatchAppIdOptions,
 ) -> Option<&'a DesktopEntry<'a>>
@@ -134,7 +120,7 @@ where
     for de in entries {
         let score = normalized_patterns
             .iter()
-            .map(|p| match_entry_not_user(p, de))
+            .map(|p| match_entry_from_id(p, de))
             .max_by(|e1, e2| e1.total_cmp(e2))
             .unwrap_or(0.0);
 

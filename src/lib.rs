@@ -5,6 +5,9 @@ mod decoder;
 mod iter;
 mod matching;
 
+#[cfg(test)]
+mod test;
+
 pub use matching::{get_best_match, get_entry_score, MatchAppIdOptions};
 
 pub use self::iter::Iter;
@@ -194,7 +197,7 @@ impl<'a> DesktopEntry<'a> {
         group.and_then(|group| group.get(key)).map(|key| &key.0)
     }
 
-    pub (crate) fn localized_entry(
+    pub(crate) fn localized_entry(
         ubuntu_gettext_domain: Option<&'a str>,
         group: Option<&'a KeyMap<'a>>,
         key: &str,
@@ -218,7 +221,6 @@ impl<'a> DesktopEntry<'a> {
                 .or(Some(key.0.clone()))
         })
     }
-    
 }
 
 use std::fmt::{self, Display, Formatter};
