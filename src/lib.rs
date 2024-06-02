@@ -5,7 +5,7 @@ mod decoder;
 mod iter;
 mod matching;
 
-pub use matching::{try_match_entries, MatchAppIdOptions};
+pub use matching::{get_best_match, get_entry_score, MatchAppIdOptions};
 
 pub use self::iter::Iter;
 use std::borrow::Cow;

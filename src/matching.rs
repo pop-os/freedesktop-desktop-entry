@@ -4,7 +4,7 @@ use crate::DesktopEntry;
 
 /// From 0 to 1.
 /// 1 is a perfect match.
-fn match_entry(query: &str, de: &DesktopEntry, _languages: &[&str]) -> f32 {
+fn match_entry_(query: &str, de: &DesktopEntry, _languages: &[&str]) -> f32 {
     let cmp = |query, de| {
         let lcsstr = textdistance::str::lcsstr(query, de);
         lcsstr as f32 / (max(query.len(), de.len())) as f32
@@ -57,9 +57,37 @@ impl Default for MatchAppIdOptions {
     }
 }
 
+/// Return the best match over all provided [`DesktopEntry`].
+/// Use this to match over the values provided by the compositor,
+/// not the user.
+pub fn get_best_match<'a, 'l, I>(
+    patterns: &'a [I],
+    entries: &'a [DesktopEntry<'a>],
+    options: MatchAppIdOptions,
+) -> Option<&'a DesktopEntry<'a>>
+where
+    I: AsRef<str>,
+{
+    todo!()
+}
+
+/// Return a score between 0 and 1
+pub fn get_entry_score<'a, 'l, I>(
+    query: I,
+    entry: &'a DesktopEntry<'a>,
+    languages: &'l [&'l str],
+) -> f32
+where
+    I: AsRef<str>,
+{
+    todo!()
+}
+
+
+
 // todo: use rayon
 /// Try to guess the best [`DesktopEntry`] match for a query.
-pub fn try_match_entries<'a, 'l, I>(
+fn try_match_entries<'a, 'l, I>(
     query: I,
     entries: &'a [DesktopEntry<'a>],
     options: MatchAppIdOptions,
@@ -74,7 +102,7 @@ where
     let normalized_query = query.as_ref().to_lowercase();
 
     for de in entries {
-        let score = match_entry(&normalized_query, de, languages);
+        let score = match_entry_(&normalized_query, de, languages);
 
         match max_score {
             Some((prev_max_score, _)) => {
