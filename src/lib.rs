@@ -70,6 +70,18 @@ impl<'a> DesktopEntry<'a> {
 }
 
 impl<'a> DesktopEntry<'a> {
+
+    /// An action is defined as `[Desktop Action actions-name]` where `action-name`
+    /// is defined in the `Actions` field of `[Desktop Entry]`.
+    /// Example: to get the `Name` field of this `new-window` action
+    /// ```txt
+    /// [Desktop Action new-window]
+    /// Name=Open a New Window
+    /// ```
+    /// you will need to call
+    /// ```rust
+    /// entry.action_entry("new-window", "Name")
+    /// ```
     pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
         let group = self
             .groups
@@ -103,10 +115,12 @@ impl<'a> DesktopEntry<'a> {
         self.action_entry_localized(action, "Name", locales)
     }
 
+    /// Return actions separated by `;`
     pub fn actions(&'a self) -> Option<&'a str> {
         self.desktop_entry("Actions")
     }
 
+    /// Return categories separated by `;`
     pub fn categories(&'a self) -> Option<&'a str> {
         self.desktop_entry("Categories")
     }
@@ -115,6 +129,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry_localized("Comment", locales)
     }
 
+    /// A desktop entry field is any field under the
+    /// `[Desktop Entry]` line
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
         Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
     }
@@ -152,10 +168,12 @@ impl<'a> DesktopEntry<'a> {
         self.appid.as_ref()
     }
 
+    /// Return keywords separated by `;`
     pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
         self.desktop_entry_localized("Keywords", locales)
     }
 
+    /// Return mime types separated by `;`
     pub fn mime_type(&'a self) -> Option<&'a str> {
         self.desktop_entry("MimeType")
     }
@@ -197,7 +215,9 @@ impl<'a> DesktopEntry<'a> {
     }
 
     fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
-        group.and_then(|group| group.get(key)).map(|key| key.0.as_ref())
+        group
+            .and_then(|group| group.get(key))
+            .map(|key| key.0.as_ref())
     }
 
     pub(crate) fn localized_entry<L: AsRef<str>>(
