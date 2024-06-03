@@ -10,17 +10,11 @@ readme = "README.md"
 categories = [ "os::unix-apis" ]
 keywords = [ "freedesktop", "desktop", "entry" ]
 
-
-
-[features]
-# Match the desktop entry with string
-matching = ["dep:textdistance", "dep:strsim"]
-
 [dependencies]
 dirs = "5.0.1"
 gettext-rs = { version = "0.7", features = ["gettext-system"]}
 memchr = "2"
-textdistance = { version = "1.0.2", optional = true }
-strsim = { version = "0.11.1", optional = true }
+textdistance = "1.0.2"
+strsim = "0.11.1"
 thiserror = "1"
 xdg = "2.4.0"

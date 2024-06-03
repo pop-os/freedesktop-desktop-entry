@@ -4,7 +4,6 @@
 mod decoder;
 mod iter;
 
-#[cfg(feature = "matching")]
 pub mod matching;
 
 #[cfg(test)]
