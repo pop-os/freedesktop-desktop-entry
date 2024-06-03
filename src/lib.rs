@@ -70,7 +70,6 @@ impl<'a> DesktopEntry<'a> {
 }
 
 impl<'a> DesktopEntry<'a> {
-
     /// An action is defined as `[Desktop Action actions-name]` where `action-name`
     /// is defined in the `Actions` field of `[Desktop Entry]`.
     /// Example: to get the `Name` field of this `new-window` action
@@ -238,7 +237,7 @@ impl<'a> DesktopEntry<'a> {
             match locale_map.get(locale.as_ref()) {
                 Some(value) => return Some(value.clone()),
                 None => {
-                    if let Some(pos) = locale.as_ref().find('_') {
+                    if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
                         if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
                             return Some(value.clone());
                         }
@@ -332,7 +331,11 @@ pub fn default_paths() -> Vec<PathBuf> {
     data_dirs.push(base_dirs.get_data_home());
     data_dirs.append(&mut base_dirs.get_data_dirs());
 
-    data_dirs.iter().map(|d| d.join("applications")).rev().collect()
+    data_dirs
+        .iter()
+        .map(|d| d.join("applications"))
+        .rev()
+        .collect()
 }
 
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
