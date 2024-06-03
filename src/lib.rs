@@ -323,6 +323,7 @@ impl PathSource {
 
 /// Returns the default paths in which desktop entries should be searched for based on the current
 /// environment.
+/// Paths are sorted by priority, in reverse, e.i the path with the greater priority will be at the end.
 ///
 /// Panics in case determining the current home directory fails.
 pub fn default_paths() -> Vec<PathBuf> {
@@ -331,7 +332,7 @@ pub fn default_paths() -> Vec<PathBuf> {
     data_dirs.push(base_dirs.get_data_home());
     data_dirs.append(&mut base_dirs.get_data_dirs());
 
-    data_dirs.iter().map(|d| d.join("applications")).collect()
+    data_dirs.iter().map(|d| d.join("applications")).rev().collect()
 }
 
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
