@@ -3,13 +3,17 @@
 
 use std::fs;
 
-use freedesktop_desktop_entry::{default_paths, DesktopEntry, Iter, PathSource};
+use freedesktop_desktop_entry::{
+    default_paths, get_languages_from_env, DesktopEntry, Iter, PathSource,
+};
 
 fn main() {
+    let locale = get_languages_from_env();
+
     for path in Iter::new(default_paths()) {
         let path_src = PathSource::guess_from(&path);
         if let Ok(bytes) = fs::read_to_string(&path) {
-            if let Ok(entry) = DesktopEntry::decode(&path, &bytes) {
+            if let Ok(entry) = DesktopEntry::decode_from_str(&path, &bytes, &locale) {
                 println!("{:?}: {}\n---\n{}", path_src, path.display(), entry);
             }
         }
