@@ -231,7 +231,6 @@ impl<'a> DesktopEntry<'a> {
         }
         return Some(default_value.clone());
     }
-
 }
 
 use std::fmt::{self, Display, Formatter};
@@ -315,37 +314,24 @@ pub fn default_paths() -> Vec<PathBuf> {
     data_dirs.iter().map(|d| d.join("applications")).collect()
 }
 
-pub (crate) fn dgettext(domain: &str, message: &str) -> String {
+pub(crate) fn dgettext(domain: &str, message: &str) -> String {
     use gettextrs::{setlocale, LocaleCategory};
     setlocale(LocaleCategory::LcAll, "");
     gettextrs::dgettext(domain, message)
 }
-
-// todo: support more variable syntax like fr_FR.
-// This will require some work in decode and values query
-// for now, just remove the _* part, cause it seems more common
 
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
 pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
-    if let Ok(mut lang) = std::env::var("LANG") {
-        if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
-            lang.truncate(start);
-            l.push(lang)
-        } else {
-            l.push(lang);
-        }
+    if let Ok(lang) = std::env::var("LANG") {
+        l.push(lang);
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
         lang.split(':').for_each(|lang| {
-            if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
-                l.push(lang.split_at(start).0.to_owned())
-            } else {
-                l.push(lang.to_owned());
-            }
+            l.push(lang.to_owned());
         })
     }
 
