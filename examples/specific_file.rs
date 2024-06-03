@@ -14,12 +14,5 @@ fn main() {
 
     if let Ok(entry) = DesktopEntry::decode_from_path(path.to_path_buf(), locales) {
         println!("{}\n---\n{}", path.display(), entry);
-
-        dbg!(entry.comment(locales));
-
-        dbg!(entry.actions());
-        
-
-        dbg!(entry.action_entry("new-window", "Name"));
     }
 }
