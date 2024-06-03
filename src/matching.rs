@@ -19,14 +19,7 @@ where
 
     // todo: cache all this ?
 
-    let fields = [
-        "Name",
-        "GenericName",
-        "Comment",
-        "Categories",
-        "Keywords",
-        "Exec",
-    ];
+    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords"];
     let fields_not_translatable = ["Exec", "StartupWMClass"];
 
     let mut normalized_values: Vec<String> = Vec::new();
@@ -39,34 +32,38 @@ where
     normalized_values.push(de_id);
     normalized_values.push(de_wm_class);
 
-    for l in locales {
-        for field in fields {
-            if let Some(e) = DesktopEntry::localized_entry(
-                None,
-                entry.groups.get("Desktop Entry"),
-                field,
-                Some(l.as_ref()),
-            ) {
-                normalized_values.push(e.to_lowercase());
-            }
-        }
-    }
+    let desktop_entry_group = entry.groups.get("Desktop Entry");
 
     for field in fields_not_translatable {
-        if let Some(e) = DesktopEntry::entry(entry.groups.get("Desktop Entry"), field) {
+        if let Some(e) = DesktopEntry::entry(desktop_entry_group, field) {
             normalized_values.push(e.to_lowercase());
         }
     }
 
-    if let Some(gettext) = &entry.ubuntu_gettext_domain {
+    for locale in locales {
         for field in fields {
-            if let Some(e) = DesktopEntry::localized_entry(
-                Some(gettext),
-                entry.groups.get("Desktop Entry"),
-                field,
-                None,
-            ) {
-                normalized_values.push(e.to_lowercase());
+            if let Some(group) = desktop_entry_group {
+                if let Some((default_value, locale_map)) = group.get(field) {
+                    match locale_map.get(locale.as_ref()) {
+                        Some(value) => {
+                            normalized_values.push(value.to_lowercase());
+                        }
+                        None => {
+                            if let Some(pos) = locale.as_ref().find('_') {
+                                if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
+                                    normalized_values.push(value.to_lowercase());
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(domain) = &entry.ubuntu_gettext_domain {
+                        let gettext_value = crate::dgettext(domain, &default_value);
+                        if !gettext_value.is_empty() {
+                            normalized_values.push(gettext_value.to_lowercase());
+                        }
+                    }
+                }
             }
         }
     }
@@ -89,7 +86,7 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     let de_id = de.appid.to_lowercase();
     let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
-    let de_name = de.name(None).unwrap_or_default().to_lowercase();
+    let de_name = de.name(&[] as &[&str]).unwrap_or_default().to_lowercase();
 
     *[de_id, de_wm_class, de_name]
         .map(|de| compare_str(pattern, &de))

@@ -33,13 +33,15 @@ impl<'a> DesktopEntry<'a> {
         let mut active_group = Cow::Borrowed("");
         let mut ubuntu_gettext_domain = None;
 
+        let locales = add_generic_locales(locales);
+
         for line in input.lines() {
             process_line(
                 line,
                 &mut groups,
                 &mut active_group,
                 &mut ubuntu_gettext_domain,
-                locales,
+                &locales,
                 Cow::Borrowed,
             )
         }
@@ -60,8 +62,9 @@ impl<'a> DesktopEntry<'a> {
         L: AsRef<str>,
     {
         let mut buf = String::new();
+        let locales = add_generic_locales(locales);
 
-        paths.map(move |path| decode_from_path_with_buf(path, locales, &mut buf))
+        paths.map(move |path| decode_from_path_with_buf(path, &locales, &mut buf))
     }
 
     /// Return an owned [`DesktopEntry`]
@@ -73,7 +76,8 @@ impl<'a> DesktopEntry<'a> {
         L: AsRef<str>,
     {
         let mut buf = String::new();
-        decode_from_path_with_buf(path, locales, &mut buf)
+        let locales = add_generic_locales(locales);
+        decode_from_path_with_buf(path, &locales, &mut buf)
     }
 }
 
@@ -187,4 +191,21 @@ where
         path: Cow::Owned(path),
         ubuntu_gettext_domain,
     })
+}
+
+/// Ex: if a locale equal fr_FR, add fr
+fn add_generic_locales<'a, L: AsRef<str>>(locales: &'a [L]) -> Vec<&'a str> {
+    let mut v = Vec::with_capacity(locales.len() + 1);
+
+    for l in locales {
+        let l = l.as_ref();
+
+        v.push(l);
+
+        if let Some(start) = memchr::memchr(b'_', l.as_bytes()) {
+            v.push(l.split_at(start).0)
+        }
+    }
+
+    v
 }

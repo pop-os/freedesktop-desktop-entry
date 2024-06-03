@@ -70,7 +70,18 @@ impl<'a> DesktopEntry<'a> {
 }
 
 impl<'a> DesktopEntry<'a> {
-    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a Cow<'a, str>> {
+    /// An action is defined as `[Desktop Action actions-name]` where `action-name`
+    /// is defined in the `Actions` field of `[Desktop Entry]`.
+    /// Example: to get the `Name` field of this `new-window` action
+    /// ```txt
+    /// [Desktop Action new-window]
+    /// Name=Open a New Window
+    /// ```
+    /// you will need to call
+    /// ```rust
+    /// entry.action_entry("new-window", "Name")
+    /// ```
+    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
         let group = self
             .groups
             .get(["Desktop Action ", action].concat().as_str());
@@ -78,53 +89,61 @@ impl<'a> DesktopEntry<'a> {
         Self::entry(group, key)
     }
 
-    pub fn action_entry_localized(
+    pub fn action_entry_localized<L: AsRef<str>>(
         &'a self,
         action: &str,
         key: &str,
-        locale: Option<&str>,
+        locales: &[L],
     ) -> Option<Cow<'a, str>> {
         let group = self
             .groups
             .get(["Desktop Action ", action].concat().as_str());
 
-        Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locale)
+        Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locales)
     }
 
-    pub fn action_exec(&'a self, action: &str) -> Option<&'a Cow<'a, str>> {
+    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
         self.action_entry(action, "Exec")
     }
 
-    pub fn action_name(&'a self, action: &str, locale: Option<&str>) -> Option<Cow<'a, str>> {
-        self.action_entry_localized(action, "Name", locale)
+    pub fn action_name<L: AsRef<str>>(
+        &'a self,
+        action: &str,
+        locales: &[L],
+    ) -> Option<Cow<'a, str>> {
+        self.action_entry_localized(action, "Name", locales)
     }
 
+    /// Return actions separated by `;`
     pub fn actions(&'a self) -> Option<&'a str> {
         self.desktop_entry("Actions")
     }
 
+    /// Return categories separated by `;`
     pub fn categories(&'a self) -> Option<&'a str> {
         self.desktop_entry("Categories")
     }
 
-    pub fn comment(&'a self, locale: Option<&str>) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Comment", locale)
+    pub fn comment<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Comment", locales)
     }
 
+    /// A desktop entry field is any field under the
+    /// `[Desktop Entry]` line
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
         Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
     }
 
-    pub fn desktop_entry_localized(
+    pub fn desktop_entry_localized<L: AsRef<str>>(
         &'a self,
         key: &str,
-        locale: Option<&str>,
+        locales: &[L],
     ) -> Option<Cow<'a, str>> {
         Self::localized_entry(
             self.ubuntu_gettext_domain.as_deref(),
             self.groups.get("Desktop Entry"),
             key,
-            locale,
+            locales,
         )
     }
 
@@ -136,8 +155,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("X-Flatpak")
     }
 
-    pub fn generic_name(&'a self, locale: Option<&str>) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("GenericName", locale)
+    pub fn generic_name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("GenericName", locales)
     }
 
     pub fn icon(&'a self) -> Option<&'a str> {
@@ -148,16 +167,18 @@ impl<'a> DesktopEntry<'a> {
         self.appid.as_ref()
     }
 
-    pub fn keywords(&'a self) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Keywords", None)
+    /// Return keywords separated by `;`
+    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Keywords", locales)
     }
 
+    /// Return mime types separated by `;`
     pub fn mime_type(&'a self) -> Option<&'a str> {
         self.desktop_entry("MimeType")
     }
 
-    pub fn name(&'a self, locale: Option<&str>) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Name", locale)
+    pub fn name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Name", locales)
     }
 
     pub fn no_display(&'a self) -> bool {
@@ -192,33 +213,42 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry(key).map_or(false, |v| v == "true")
     }
 
-    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a Cow<'a, str>> {
-        group.and_then(|group| group.get(key)).map(|key| &key.0)
+    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
+        group
+            .and_then(|group| group.get(key))
+            .map(|key| key.0.as_ref())
     }
 
-    pub(crate) fn localized_entry(
+    pub(crate) fn localized_entry<L: AsRef<str>>(
         ubuntu_gettext_domain: Option<&'a str>,
         group: Option<&'a KeyMap<'a>>,
         key: &str,
-        locale: Option<&str>,
+        locales: &[L],
     ) -> Option<Cow<'a, str>> {
-        group.and_then(|group| group.get(key)).and_then(|key| {
-            locale
-                .and_then(|locale| match key.1.get(locale).cloned() {
-                    Some(value) => Some(value),
-                    None => {
-                        if let Some(pos) = locale.find('_') {
-                            key.1.get(&locale[..pos]).cloned()
-                        } else {
-                            None
+        let Some(group) = group else {
+            return None;
+        };
+
+        let Some((default_value, locale_map)) = group.get(key) else {
+            return None;
+        };
+
+        for locale in locales {
+            match locale_map.get(locale.as_ref()) {
+                Some(value) => return Some(value.clone()),
+                None => {
+                    if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
+                        if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
+                            return Some(value.clone());
                         }
                     }
-                })
-                .or_else(|| {
-                    ubuntu_gettext_domain.map(|domain| Cow::Owned(dgettext(domain, &key.0)))
-                })
-                .or(Some(key.0.clone()))
-        })
+                }
+            }
+        }
+        if let Some(domain) = ubuntu_gettext_domain {
+            return Some(Cow::Owned(dgettext(domain, &default_value)));
+        }
+        return Some(default_value.clone());
     }
 }
 
@@ -292,6 +322,7 @@ impl PathSource {
 
 /// Returns the default paths in which desktop entries should be searched for based on the current
 /// environment.
+/// Paths are sorted by priority, in reverse, e.i the path with the greater priority will be at the end.
 ///
 /// Panics in case determining the current home directory fails.
 pub fn default_paths() -> Vec<PathBuf> {
@@ -300,40 +331,31 @@ pub fn default_paths() -> Vec<PathBuf> {
     data_dirs.push(base_dirs.get_data_home());
     data_dirs.append(&mut base_dirs.get_data_dirs());
 
-    data_dirs.iter().map(|d| d.join("applications")).collect()
+    data_dirs
+        .iter()
+        .map(|d| d.join("applications"))
+        .rev()
+        .collect()
 }
 
-fn dgettext(domain: &str, message: &str) -> String {
+pub(crate) fn dgettext(domain: &str, message: &str) -> String {
     use gettextrs::{setlocale, LocaleCategory};
     setlocale(LocaleCategory::LcAll, "");
     gettextrs::dgettext(domain, message)
 }
-
-// todo: support more variable syntax like fr_FR.
-// This will require some work in decode and values query
-// for now, just remove the _* part, cause it seems more common
 
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
 pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
-    if let Ok(mut lang) = std::env::var("LANG") {
-        if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
-            lang.truncate(start);
-            l.push(lang)
-        } else {
-            l.push(lang);
-        }
+    if let Ok(lang) = std::env::var("LANG") {
+        l.push(lang);
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
         lang.split(':').for_each(|lang| {
-            if let Some(start) = memchr::memchr(b'_', lang.as_bytes()) {
-                l.push(lang.split_at(start).0.to_owned())
-            } else {
-                l.push(lang.to_owned());
-            }
+            l.push(lang.to_owned());
         })
     }
 

@@ -9,6 +9,7 @@ pub struct Iter {
 }
 
 impl Iter {
+    /// Directories will be processed in order, starting from the end.
     pub fn new(directories_to_walk: Vec<PathBuf>) -> Self {
         Self {
             directories_to_walk,
@@ -25,8 +26,7 @@ impl Iterator for Iter {
             let mut iterator = match self.actively_walking.take() {
                 Some(dir) => dir,
                 None => {
-                    while !self.directories_to_walk.is_empty() {
-                        let path = self.directories_to_walk.remove(0);
+                    while let Some(path) = self.directories_to_walk.pop() {
                         match fs::read_dir(&path) {
                             Ok(directory) => {
                                 self.actively_walking = Some(directory);
@@ -37,6 +37,7 @@ impl Iterator for Iter {
                             Err(_) => continue,
                         }
                     }
+                
 
                     return None;
                 }
@@ -48,7 +49,7 @@ impl Iterator for Iter {
 
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
-                            self.directories_to_walk.insert(0, path);
+                            self.directories_to_walk.push(path);
                         } else if (file_type.is_file() || file_type.is_symlink())
                             && path.extension().map_or(false, |ext| ext == "desktop")
                         {
