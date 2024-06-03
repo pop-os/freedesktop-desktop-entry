@@ -16,5 +16,10 @@ fn main() {
         println!("{}\n---\n{}", path.display(), entry);
 
         dbg!(entry.comment(locales));
+
+        dbg!(entry.actions());
+        
+
+        dbg!(entry.action_entry("new-window", "Name"));
     }
 }

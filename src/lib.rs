@@ -70,7 +70,7 @@ impl<'a> DesktopEntry<'a> {
 }
 
 impl<'a> DesktopEntry<'a> {
-    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a Cow<'a, str>> {
+    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
         let group = self
             .groups
             .get(["Desktop Action ", action].concat().as_str());
@@ -91,7 +91,7 @@ impl<'a> DesktopEntry<'a> {
         Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locales)
     }
 
-    pub fn action_exec(&'a self, action: &str) -> Option<&'a Cow<'a, str>> {
+    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
         self.action_entry(action, "Exec")
     }
 
@@ -196,8 +196,8 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry(key).map_or(false, |v| v == "true")
     }
 
-    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a Cow<'a, str>> {
-        group.and_then(|group| group.get(key)).map(|key| &key.0)
+    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
+        group.and_then(|group| group.get(key)).map(|key| key.0.as_ref())
     }
 
     pub(crate) fn localized_entry<L: AsRef<str>>(
