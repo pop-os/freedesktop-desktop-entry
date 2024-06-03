@@ -13,12 +13,12 @@ use freedesktop_desktop_entry::{
 };
 
 fn main() {
-    let locale = get_languages_from_env();
+    let locales = get_languages_from_env();
 
     for path in Iter::new(default_paths()) {
         let path_src = PathSource::guess_from(&path);
         if let Ok(bytes) = fs::read_to_string(&path) {
-            if let Ok(entry) = DesktopEntry::decode_from_str(&path, &bytes, &locale) {
+            if let Ok(entry) = DesktopEntry::decode_from_str(&path, &bytes, &locales) {
                 println!("{:?}: {}\n---\n{}", path_src, path.display(), entry);
             }
         }
