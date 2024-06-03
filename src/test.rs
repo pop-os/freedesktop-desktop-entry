@@ -13,7 +13,7 @@ fn test() {
             None,
             entry.groups.get("Desktop Entry"),
             "GenericName",
-            Some("fr"),
+            &["fr"],
         )
         .unwrap();
 
