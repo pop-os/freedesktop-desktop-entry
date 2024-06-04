@@ -46,12 +46,13 @@ impl DesktopEntry<'_> {
         de
     }
 }
+
 impl<'a> DesktopEntry<'a> {
-    // todo: impl ToOwned ?
-    pub fn into_owned(self) -> DesktopEntry<'static> {
+    // note that we shoudn't implement ToOwned in this case: https://stackoverflow.com/questions/72105604/implement-toowned-for-user-defined-types
+    pub fn to_owned(&self) -> DesktopEntry<'static> {
         let mut new_groups = Groups::new();
 
-        for (group, key_map) in self.groups {
+        for (group, key_map) in &self.groups {
             let mut new_key_map = KeyMap::new();
 
             for (key, (value, locale_map)) in key_map {
@@ -59,27 +60,30 @@ impl<'a> DesktopEntry<'a> {
 
                 for (locale, value) in locale_map {
                     new_locale_map.insert(
-                        Cow::Owned(locale.into_owned()),
-                        Cow::Owned(value.into_owned()),
+                        Cow::Owned(locale.to_string()),
+                        Cow::Owned(value.to_string()),
                     );
                 }
 
                 new_key_map.insert(
-                    Cow::Owned(key.into_owned()),
-                    (Cow::Owned(value.into_owned()), new_locale_map),
+                    Cow::Owned(key.to_string()),
+                    (Cow::Owned(value.to_string()), new_locale_map),
                 );
             }
 
-            new_groups.insert(Cow::Owned(group.into_owned()), new_key_map);
+            new_groups.insert(Cow::Owned(group.to_string()), new_key_map);
         }
 
         DesktopEntry {
-            appid: Cow::Owned(self.appid.into_owned()),
+            appid: Cow::Owned(self.appid.to_string()),
             groups: new_groups,
-            ubuntu_gettext_domain: self
-                .ubuntu_gettext_domain
-                .map(|e| Cow::Owned(e.into_owned())),
-            path: Cow::Owned(self.path.into_owned()),
+            ubuntu_gettext_domain: if let Some(ubuntu_gettext_domain) = &self.ubuntu_gettext_domain
+            {
+                Some(Cow::Owned(ubuntu_gettext_domain.to_string()))
+            } else {
+                None
+            },
+            path: Cow::Owned(self.path.to_path_buf()),
         }
     }
 }
