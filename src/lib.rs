@@ -89,8 +89,7 @@ impl<'a> DesktopEntry<'a> {
         self.appid.as_ref()
     }
 
-    /// A desktop entry field is any field under the
-    /// `[Desktop Entry]` line
+    /// A desktop entry field is any field under the `[Desktop Entry]` section.
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
         Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
     }
@@ -108,7 +107,7 @@ impl<'a> DesktopEntry<'a> {
         )
     }
 
-    /// Insert a new field to this [`DesktopEntry`], in the "Desktop Entry" section, removing
+    /// Insert a new field to this [`DesktopEntry`], in the `[Desktop Entry]` section, removing
     /// the previous value and locales in any.
     pub fn add_desktop_entry<'b>(&'b mut self, key: &'a str, value: &'a str)
     where
