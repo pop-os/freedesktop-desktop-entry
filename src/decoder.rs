@@ -19,7 +19,7 @@ pub enum DecodeError {
 }
 
 impl<'a> DesktopEntry<'a> {
-    pub fn decode_from_str<L>(
+    pub fn from_str<L>(
         path: &'a Path,
         input: &'a str,
         locales: &[L],
@@ -54,7 +54,7 @@ impl<'a> DesktopEntry<'a> {
         })
     }
 
-    pub fn decode_from_paths<'i, 'l: 'i, L>(
+    pub fn from_paths<'i, 'l: 'i, L>(
         paths: impl Iterator<Item = PathBuf> + 'i,
         locales: &'l [L],
     ) -> impl Iterator<Item = Result<DesktopEntry<'static>, DecodeError>> + 'i
@@ -68,7 +68,7 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return an owned [`DesktopEntry`]
-    pub fn decode_from_path<L>(
+    pub fn from_path<L>(
         path: PathBuf,
         locales: &[L],
     ) -> Result<DesktopEntry<'static>, DecodeError>

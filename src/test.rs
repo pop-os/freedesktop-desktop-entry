@@ -8,7 +8,7 @@ fn test() {
 
     let locales = &["fr", "fr_FR.UTF-8"];
 
-    if let Ok(entry) = DesktopEntry::decode_from_path(path.to_path_buf(), locales) {
+    if let Ok(entry) = DesktopEntry::from_path(path.to_path_buf(), locales) {
         let e = DesktopEntry::localized_entry(
             None,
             entry.groups.get("Desktop Entry"),

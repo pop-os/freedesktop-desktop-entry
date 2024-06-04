@@ -24,7 +24,7 @@ pub type Locale<'a> = Cow<'a, str>;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = Cow<'a, str>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DesktopEntry<'a> {
     pub appid: Cow<'a, str>,
     pub groups: Groups<'a>,
@@ -32,11 +32,27 @@ pub struct DesktopEntry<'a> {
     pub ubuntu_gettext_domain: Option<Cow<'a, str>>,
 }
 
+impl DesktopEntry<'_> {
+    /// Construct a new [`DesktopEntry`] from an appid. The name field will be
+    /// set to that appid.
+    pub fn from_appid<'a>(appid: &'a str) -> DesktopEntry<'a> {
+        let mut de = DesktopEntry {
+            appid: Cow::Borrowed(appid),
+            groups: Groups::default(),
+            path: Cow::Owned(PathBuf::from("")),
+            ubuntu_gettext_domain: None,
+        };
+        de.add_desktop_entry("Name", appid);
+        de
+    }
+}
+
 impl<'a> DesktopEntry<'a> {
-    pub fn into_owned(self) -> DesktopEntry<'static> {
+    // note that we shoudn't implement ToOwned in this case: https://stackoverflow.com/questions/72105604/implement-toowned-for-user-defined-types
+    pub fn to_owned(&self) -> DesktopEntry<'static> {
         let mut new_groups = Groups::new();
 
-        for (group, key_map) in self.groups {
+        for (group, key_map) in &self.groups {
             let mut new_key_map = KeyMap::new();
 
             for (key, (value, locale_map)) in key_map {
@@ -44,32 +60,152 @@ impl<'a> DesktopEntry<'a> {
 
                 for (locale, value) in locale_map {
                     new_locale_map.insert(
-                        Cow::Owned(locale.into_owned()),
-                        Cow::Owned(value.into_owned()),
+                        Cow::Owned(locale.to_string()),
+                        Cow::Owned(value.to_string()),
                     );
                 }
 
                 new_key_map.insert(
-                    Cow::Owned(key.into_owned()),
-                    (Cow::Owned(value.into_owned()), new_locale_map),
+                    Cow::Owned(key.to_string()),
+                    (Cow::Owned(value.to_string()), new_locale_map),
                 );
             }
 
-            new_groups.insert(Cow::Owned(group.into_owned()), new_key_map);
+            new_groups.insert(Cow::Owned(group.to_string()), new_key_map);
         }
 
         DesktopEntry {
-            appid: Cow::Owned(self.appid.into_owned()),
+            appid: Cow::Owned(self.appid.to_string()),
             groups: new_groups,
-            ubuntu_gettext_domain: self
-                .ubuntu_gettext_domain
-                .map(|e| Cow::Owned(e.into_owned())),
-            path: Cow::Owned(self.path.into_owned()),
+            ubuntu_gettext_domain: if let Some(ubuntu_gettext_domain) = &self.ubuntu_gettext_domain
+            {
+                Some(Cow::Owned(ubuntu_gettext_domain.to_string()))
+            } else {
+                None
+            },
+            path: Cow::Owned(self.path.to_path_buf()),
         }
     }
 }
 
 impl<'a> DesktopEntry<'a> {
+    pub fn id(&'a self) -> &'a str {
+        self.appid.as_ref()
+    }
+
+    /// A desktop entry field is any field under the `[Desktop Entry]` section.
+    pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
+        Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
+    }
+
+    pub fn desktop_entry_localized<L: AsRef<str>>(
+        &'a self,
+        key: &str,
+        locales: &[L],
+    ) -> Option<Cow<'a, str>> {
+        Self::localized_entry(
+            self.ubuntu_gettext_domain.as_deref(),
+            self.groups.get("Desktop Entry"),
+            key,
+            locales,
+        )
+    }
+
+    /// Insert a new field to this [`DesktopEntry`], in the `[Desktop Entry]` section, removing
+    /// the previous value and locales in any.
+    pub fn add_desktop_entry<'b>(&'b mut self, key: &'a str, value: &'a str)
+    where
+        'a: 'b,
+    {
+        let action_key = "Desktop Entry";
+        let key = Cow::Borrowed(key);
+        let value = (Cow::Borrowed(value), LocaleMap::default());
+
+        match self.groups.get_mut(action_key) {
+            Some(keymap) => {
+                keymap.insert(key, value);
+            }
+            None => {
+                let mut keymap = KeyMap::default();
+                keymap.insert(key, value);
+                self.groups.insert(Cow::Borrowed(action_key), keymap);
+            }
+        }
+    }
+
+    pub fn name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Name", locales)
+    }
+
+    pub fn generic_name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("GenericName", locales)
+    }
+
+    pub fn icon(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Icon")
+    }
+
+    /// This is an human readable description of the desktop file.
+    pub fn comment<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Comment", locales)
+    }
+
+    pub fn exec(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Exec")
+    }
+
+    /// Return categories separated by `;`
+    pub fn categories(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Categories")
+    }
+
+    /// Return keywords separated by `;`
+    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+        self.desktop_entry_localized("Keywords", locales)
+    }
+
+    /// Return mime types separated by `;`
+    pub fn mime_type(&'a self) -> Option<&'a str> {
+        self.desktop_entry("MimeType")
+    }
+
+    pub fn no_display(&'a self) -> bool {
+        self.desktop_entry_bool("NoDisplay")
+    }
+
+    pub fn only_show_in(&'a self) -> Option<&'a str> {
+        self.desktop_entry("OnlyShowIn")
+    }
+
+    pub fn flatpak(&'a self) -> Option<&'a str> {
+        self.desktop_entry("X-Flatpak")
+    }
+
+    pub fn prefers_non_default_gpu(&'a self) -> bool {
+        self.desktop_entry_bool("PrefersNonDefaultGPU")
+    }
+
+    pub fn startup_notify(&'a self) -> bool {
+        self.desktop_entry_bool("StartupNotify")
+    }
+
+    pub fn startup_wm_class(&'a self) -> Option<&'a str> {
+        self.desktop_entry("StartupWMClass")
+    }
+
+    pub fn terminal(&'a self) -> bool {
+        self.desktop_entry_bool("Terminal")
+    }
+
+    pub fn type_(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Type")
+    }
+
+    /// Return actions separated by `;`
+    pub fn actions(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Actions")
+    }
+
     /// An action is defined as `[Desktop Action actions-name]` where `action-name`
     /// is defined in the `Actions` field of `[Desktop Entry]`.
     /// Example: to get the `Name` field of this `new-window` action
@@ -102,10 +238,6 @@ impl<'a> DesktopEntry<'a> {
         Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locales)
     }
 
-    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
-        self.action_entry(action, "Exec")
-    }
-
     pub fn action_name<L: AsRef<str>>(
         &'a self,
         action: &str,
@@ -114,99 +246,8 @@ impl<'a> DesktopEntry<'a> {
         self.action_entry_localized(action, "Name", locales)
     }
 
-    /// Return actions separated by `;`
-    pub fn actions(&'a self) -> Option<&'a str> {
-        self.desktop_entry("Actions")
-    }
-
-    /// Return categories separated by `;`
-    pub fn categories(&'a self) -> Option<&'a str> {
-        self.desktop_entry("Categories")
-    }
-
-    pub fn comment<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Comment", locales)
-    }
-
-    /// A desktop entry field is any field under the
-    /// `[Desktop Entry]` line
-    pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
-    }
-
-    pub fn desktop_entry_localized<L: AsRef<str>>(
-        &'a self,
-        key: &str,
-        locales: &[L],
-    ) -> Option<Cow<'a, str>> {
-        Self::localized_entry(
-            self.ubuntu_gettext_domain.as_deref(),
-            self.groups.get("Desktop Entry"),
-            key,
-            locales,
-        )
-    }
-
-    pub fn exec(&'a self) -> Option<&'a str> {
-        self.desktop_entry("Exec")
-    }
-
-    pub fn flatpak(&'a self) -> Option<&'a str> {
-        self.desktop_entry("X-Flatpak")
-    }
-
-    pub fn generic_name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("GenericName", locales)
-    }
-
-    pub fn icon(&'a self) -> Option<&'a str> {
-        self.desktop_entry("Icon")
-    }
-
-    pub fn id(&'a self) -> &'a str {
-        self.appid.as_ref()
-    }
-
-    /// Return keywords separated by `;`
-    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Keywords", locales)
-    }
-
-    /// Return mime types separated by `;`
-    pub fn mime_type(&'a self) -> Option<&'a str> {
-        self.desktop_entry("MimeType")
-    }
-
-    pub fn name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Name", locales)
-    }
-
-    pub fn no_display(&'a self) -> bool {
-        self.desktop_entry_bool("NoDisplay")
-    }
-
-    pub fn only_show_in(&'a self) -> Option<&'a str> {
-        self.desktop_entry("OnlyShowIn")
-    }
-
-    pub fn prefers_non_default_gpu(&'a self) -> bool {
-        self.desktop_entry_bool("PrefersNonDefaultGPU")
-    }
-
-    pub fn startup_notify(&'a self) -> bool {
-        self.desktop_entry_bool("StartupNotify")
-    }
-
-    pub fn startup_wm_class(&'a self) -> Option<&'a str> {
-        self.desktop_entry("StartupWMClass")
-    }
-
-    pub fn terminal(&'a self) -> bool {
-        self.desktop_entry_bool("Terminal")
-    }
-
-    pub fn type_(&'a self) -> Option<&'a str> {
-        self.desktop_entry("Type")
+    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
+        self.action_entry(action, "Exec")
     }
 
     fn desktop_entry_bool(&'a self, key: &str) -> bool {
