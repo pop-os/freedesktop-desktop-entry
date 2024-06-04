@@ -12,7 +12,7 @@ fn main() {
     //     }
     // }
 
-    if let Ok(entry) = DesktopEntry::decode_from_path(path.to_path_buf(), locales) {
+    if let Ok(entry) = DesktopEntry::from_path(path.to_path_buf(), locales) {
         println!("{}\n---\n{}", path.display(), entry);
     }
 }

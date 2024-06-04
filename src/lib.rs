@@ -33,6 +33,8 @@ pub struct DesktopEntry<'a> {
 }
 
 impl DesktopEntry<'_> {
+    /// Construct a new [`DesktopEntry`] from an appid. The name field will be
+    /// set to that appid.
     pub fn from_appid<'a>(appid: &'a str) -> DesktopEntry<'a> {
         let mut de = DesktopEntry {
             appid: Cow::Borrowed(appid),
@@ -45,6 +47,7 @@ impl DesktopEntry<'_> {
     }
 }
 impl<'a> DesktopEntry<'a> {
+    // todo: impl ToOwned ?
     pub fn into_owned(self) -> DesktopEntry<'static> {
         let mut new_groups = Groups::new();
 
@@ -105,6 +108,8 @@ impl<'a> DesktopEntry<'a> {
         )
     }
 
+    /// Insert a new field to this [`DesktopEntry`], in the "Desktop Entry" section, removing
+    /// the previous value and locales in any.
     pub fn add_desktop_entry<'b>(&'b mut self, key: &'a str, value: &'a str)
     where
         'a: 'b,
