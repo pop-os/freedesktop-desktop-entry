@@ -29,6 +29,18 @@ pub enum ExecError<'a> {
     #[error("Exec key not found in desktop entry '{0:?}'")]
     MissingExecKey(&'a Path),
 
+    #[error("Action '{action}' not found for desktop entry '{desktop_entry:?}'")]
+    ActionNotFound {
+        action: String,
+        desktop_entry: &'a Path,
+    },
+
+    #[error("Exec key not found for action :'{action}' in desktop entry '{desktop_entry:?}'")]
+    ActionExecKeyNotFound {
+        action: String,
+        desktop_entry: &'a Path,
+    },
+
     #[error("Failed to launch aplication via dbus: {0}")]
     DBusError(#[from] zbus::Error),
 
