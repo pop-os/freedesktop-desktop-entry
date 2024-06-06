@@ -15,9 +15,27 @@ pub mod error;
 mod graphics;
 
 impl<'a> DesktopEntry<'a> {
+    pub fn launch<L>(&self, prefer_non_default_gpu: bool) -> Result<(), ExecError>
+    where
+        L: AsRef<str>,
+    {
+        match Connection::session() {
+            Ok(conn) => {
+                if self.is_bus_actionable(&conn) {
+                    self.dbus_launch(&conn, &[])
+                } else {
+                    self.shell_launch(&[], prefer_non_default_gpu, &[] as &[&str])
+                }
+            }
+            Err(_) => self.shell_launch(&[], prefer_non_default_gpu, &[] as &[&str]),
+        }
+    }
+
     /// Execute the given desktop entry `Exec` key with either the default gpu or
     /// the alternative one if available.
-    pub fn launch<L>(
+    /// Macros like `%f` (cf [.desktop spec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#exec-variables)) will
+    /// be subtitued using the `uris` parameter.
+    pub fn launch_with_uris<L>(
         &self,
         uris: &[&'a str],
         prefer_non_default_gpu: bool,
@@ -253,7 +271,7 @@ mod test {
         let path = PathBuf::from("tests/entries/unmatched-quotes.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&[], false, &locales);
+        let result = de.launch_with_uris(&[], false, &locales);
 
         assert_that!(result)
             .is_err()
@@ -265,7 +283,7 @@ mod test {
         let path = PathBuf::from("tests/entries/empty-exec.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&[], false, &locales);
+        let result = de.launch_with_uris(&[], false, &locales);
 
         assert_that!(result)
             .is_err()
@@ -278,7 +296,7 @@ mod test {
         let path = PathBuf::from("tests/entries/alacritty-simple.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&[], false, &locales);
+        let result = de.launch_with_uris(&[], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -289,7 +307,7 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&[], false, &locales);
+        let result = de.launch_with_uris(&[], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -300,7 +318,7 @@ mod test {
         let path = PathBuf::from("tests/entries/non-terminal-cmd.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&[], false, &locales);
+        let result = de.launch_with_uris(&[], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -311,7 +329,7 @@ mod test {
         let path = PathBuf::from("/usr/share/applications/nvim.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&["src/lib.rs"], false, &locales);
+        let result = de.launch_with_uris(&["src/lib.rs"], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -322,7 +340,7 @@ mod test {
         let path = PathBuf::from("/usr/share/applications/org.gnome.Books.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let result = de.launch(&["src/lib.rs"], false, &locales);
+        let result = de.launch_with_uris(&["src/lib.rs"], false, &locales);
 
         assert_that!(result).is_ok();
     }
@@ -333,11 +351,11 @@ mod test {
         let path = PathBuf::from("/usr/share/applications/org.gnome.Nautilus.desktop");
         let locales = get_languages_from_env();
         let de = DesktopEntry::from_path(path, &locales).unwrap();
-        let _result = de.launch(&[], false, &locales);
+        let _result = de.launch_with_uris(&[], false, &locales);
         let path = std::env::current_dir().unwrap();
         let path = path.to_string_lossy();
         let path = format!("file:///{path}");
-        let result = de.launch(&[path.as_str()], false, &locales);
+        let result = de.launch_with_uris(&[path.as_str()], false, &locales);
 
         assert_that!(result).is_ok();
     }
