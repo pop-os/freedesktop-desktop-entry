@@ -151,27 +151,35 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Exec")
     }
 
-    /// Return categories separated by `;`
-    pub fn categories(&'a self) -> Option<&'a str> {
+    /// Return categories
+    pub fn categories(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("Categories")
+            .map(|e| e.split(';').collect())
     }
 
-    /// Return keywords separated by `;`
-    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
-        self.desktop_entry_localized("Keywords", locales)
+    /// Return keywords
+    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Vec<Cow<'a, str>>> {
+        self.localized_entry_splitted(self.groups.get("Desktop Entry"), "Keywords", locales)
     }
 
-    /// Return mime types separated by `;`
-    pub fn mime_type(&'a self) -> Option<&'a str> {
+    /// Return mime types
+    pub fn mime_type(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("MimeType")
+            .map(|e| e.split(';').collect())
     }
 
     pub fn no_display(&'a self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
-    pub fn only_show_in(&'a self) -> Option<&'a str> {
+    pub fn only_show_in(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("OnlyShowIn")
+            .map(|e| e.split(';').collect())
+    }
+
+    pub fn not_show_in(&'a self) -> Option<Vec<&'a str>> {
+        self.desktop_entry("NotShowIn")
+            .map(|e| e.split(';').collect())
     }
 
     pub fn flatpak(&'a self) -> Option<&'a str> {
@@ -198,9 +206,9 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Type")
     }
 
-    /// Return actions separated by `;`
-    pub fn actions(&'a self) -> Option<&'a str> {
+    pub fn actions(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("Actions")
+            .map(|e| e.split(';').collect())
     }
 
     /// An action is defined as `[Desktop Action actions-name]` where `action-name`
@@ -281,6 +289,40 @@ impl<'a> DesktopEntry<'a> {
             return Some(Cow::Owned(dgettext(domain, default_value)));
         }
         Some(default_value.clone())
+    }
+
+    pub fn localized_entry_splitted<L: AsRef<str>>(
+        &self,
+        group: Option<&'a KeyMap<'a>>,
+        key: &str,
+        locales: &[L],
+    ) -> Option<Vec<Cow<'a, str>>> {
+        let (default_value, locale_map) = group?.get(key)?;
+
+        for locale in locales {
+            match locale_map.get(locale.as_ref()) {
+                Some(value) => {
+                    return Some(value.split(';').map(|e| Cow::Borrowed(e)).collect());
+                }
+                None => {
+                    if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
+                        if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
+                            return Some(value.split(';').map(|e| Cow::Borrowed(e)).collect());
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(domain) = &self.ubuntu_gettext_domain {
+            return Some(
+                dgettext(domain, default_value)
+                    .split(';')
+                    .map(|e| Cow::Owned(e.to_string()))
+                    .collect(),
+            );
+        }
+
+        Some(default_value.split(';').map(|e| Cow::Borrowed(e)).collect())
     }
 }
 
