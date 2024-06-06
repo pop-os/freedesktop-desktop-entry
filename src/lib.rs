@@ -11,6 +11,7 @@ pub mod matching;
 pub use self::iter::Iter;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 
 use std::path::{Path, PathBuf};
 use xdg::BaseDirectories;
@@ -23,13 +24,26 @@ pub type Locale<'a> = Cow<'a, str>;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = Cow<'a, str>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct DesktopEntry<'a> {
     pub appid: Cow<'a, str>,
     pub groups: Groups<'a>,
     pub path: Cow<'a, Path>,
     pub ubuntu_gettext_domain: Option<Cow<'a, str>>,
 }
+
+impl Hash for DesktopEntry<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.appid.hash(state);
+    }
+}
+
+impl PartialEq for DesktopEntry<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.appid == other.appid
+    }
+}
+
 
 impl DesktopEntry<'_> {
     /// Construct a new [`DesktopEntry`] from an appid. The name field will be
@@ -434,6 +448,17 @@ pub fn get_languages_from_env() -> Vec<String> {
     }
 
     l
+}
+
+pub fn current_desktop() -> Option<Vec<String>> {
+    std::env::var("XDG_CURRENT_DESKTOP").ok().map(|x| {
+        let x = x.to_ascii_lowercase();
+        if x == "unity" {
+            vec!["gnome".to_string()]
+        } else {
+            x.split(':').map(|e| e.to_string()).collect()
+        }
+    })
 }
 
 #[test]
