@@ -8,31 +8,20 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::process::Command;
-use zbus::blocking::Connection;
 
 mod dbus;
 pub mod error;
 mod graphics;
 
 impl<'a> DesktopEntry<'a> {
-    pub fn launch<L>(&self, prefer_non_default_gpu: bool) -> Result<(), ExecError>
-    where
-        L: AsRef<str>,
-    {
-        match Connection::session() {
-            Ok(conn) => {
-                if self.is_bus_actionable(&conn) {
-                    self.dbus_launch(&conn, &[])
-                } else {
-                    self.shell_launch(&[], prefer_non_default_gpu, &[] as &[&str])
-                }
-            }
-            Err(_) => self.shell_launch(&[], prefer_non_default_gpu, &[] as &[&str]),
+    pub fn launch(&self, prefer_non_default_gpu: bool) -> Result<(), ExecError> {
+        match self.should_launch_on_dbus() {
+            Some(conn) => self.dbus_launch(&conn, &[]),
+            None => self.shell_launch(self.exec(), &[], prefer_non_default_gpu, &[] as &[&str]),
         }
     }
 
-    /// Execute the given desktop entry `Exec` key with either the default gpu or
-    /// the alternative one if available.
+    /// Execute the given desktop entry `Exec` key with either the default gpu or the alternative one if available.
     /// Macros like `%f` (cf [.desktop spec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#exec-variables)) will
     /// be subtitued using the `uris` parameter.
     pub fn launch_with_uris<L>(
@@ -44,20 +33,53 @@ impl<'a> DesktopEntry<'a> {
     where
         L: AsRef<str>,
     {
-        match Connection::session() {
-            Ok(conn) => {
-                if self.is_bus_actionable(&conn) {
-                    self.dbus_launch(&conn, uris)
-                } else {
-                    self.shell_launch(uris, prefer_non_default_gpu, locales)
-                }
-            }
-            Err(_) => self.shell_launch(uris, prefer_non_default_gpu, locales),
+        match self.should_launch_on_dbus() {
+            Some(conn) => self.dbus_launch(&conn, uris),
+            None => self.shell_launch(self.exec(), uris, prefer_non_default_gpu, locales),
         }
     }
 
-    fn shell_launch<L>(
+    pub fn launch_action(
         &self,
+        action_name: &str,
+        prefer_non_default_gpu: bool,
+    ) -> Result<(), ExecError> {
+        match self.should_launch_on_dbus() {
+            Some(conn) => self.dbus_launch_action(&conn, action_name, &[]),
+            None => self.shell_launch(
+                self.action_exec(action_name),
+                &[],
+                prefer_non_default_gpu,
+                &[] as &[&str],
+            ),
+        }
+    }
+
+    pub fn launch_action_with_uris<L>(
+        &self,
+        action_name: &str,
+        uris: &[&'a str],
+        prefer_non_default_gpu: bool,
+        locales: &[L],
+    ) -> Result<(), ExecError>
+    where
+        L: AsRef<str>,
+    {
+        match self.should_launch_on_dbus() {
+            Some(conn) => self.dbus_launch_action(&conn, action_name, uris),
+            None => self.shell_launch(
+                self.action_exec(action_name),
+                uris,
+                prefer_non_default_gpu,
+                locales,
+            ),
+        }
+    }
+
+    // https://github.com/pop-os/libcosmic/blob/master/src/desktop.rs
+    fn shell_launch<L>(
+        &'a self,
+        exec: Option<&'a str>,
         uris: &[&str],
         prefer_non_default_gpu: bool,
         locales: &[L],
@@ -65,7 +87,6 @@ impl<'a> DesktopEntry<'a> {
     where
         L: AsRef<str>,
     {
-        let exec = self.exec();
         if exec.is_none() {
             return Err(ExecError::MissingExecKey(&self.path));
         }
