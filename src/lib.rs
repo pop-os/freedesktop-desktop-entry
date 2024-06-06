@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod decoder;
-pub mod exec;
+mod exec;
+pub use exec::error::ExecError;
 mod iter;
 
 pub mod matching;
-
-#[cfg(test)]
-mod test;
 
 pub use self::iter::Iter;
 use std::borrow::Cow;
@@ -418,8 +416,7 @@ fn env_with_locale() {
 
     assert_eq!(de.generic_name(locales).unwrap(), "Navigateur Web");
 
-
     let locales = &["nb"];
-    
+
     assert_eq!(de.generic_name(locales).unwrap(), "Web Browser");
 }
