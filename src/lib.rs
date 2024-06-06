@@ -213,7 +213,7 @@ impl<'a> DesktopEntry<'a> {
     /// Name=Open a New Window
     /// ```
     /// you will need to call
-    /// ```rust
+    /// ```ignore
     /// entry.action_entry("new-window", "Name")
     /// ```
     pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
@@ -397,8 +397,29 @@ pub fn get_languages_from_env() -> Vec<String> {
 }
 
 #[test]
-fn locales_env_test() {
+fn add_field() {
+    let appid = "appid";
+    let de = DesktopEntry::from_appid(appid);
+
+    assert_eq!(de.appid, appid);
+    assert_eq!(de.name(&[] as &[&str]).unwrap(), appid);
+
     let s = get_languages_from_env();
 
     println!("{:?}", s);
+}
+
+#[test]
+fn env_with_locale() {
+    let locales = &["fr_FR"];
+
+    let de = DesktopEntry::from_path(PathBuf::from("tests/org.mozilla.firefox.desktop"), locales)
+        .unwrap();
+
+    assert_eq!(de.generic_name(locales).unwrap(), "Navigateur Web");
+
+
+    let locales = &["nb"];
+    
+    assert_eq!(de.generic_name(locales).unwrap(), "Web Browser");
 }
