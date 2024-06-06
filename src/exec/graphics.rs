@@ -172,7 +172,6 @@ fn get_gpus() -> io::Result<HashSet<Dev>> {
     let mut dev_map = HashSet::new();
     let mut drivers: Vec<Dev> = enumerator
         .scan_devices()?
-        .into_iter()
         .filter(|dev| {
             dev.devnode()
                 .map(|path| path.starts_with("/dev/dri"))

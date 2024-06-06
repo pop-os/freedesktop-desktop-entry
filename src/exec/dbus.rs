@@ -42,7 +42,7 @@ impl DesktopEntry<'_> {
         }
 
         if !uris.is_empty() {
-            app_proxy.open(&uris, platform_data)?;
+            app_proxy.open(uris, platform_data)?;
         } else {
             app_proxy.activate(platform_data)?;
         }

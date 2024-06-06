@@ -191,7 +191,7 @@ where
 }
 
 /// Ex: if a locale equal fr_FR, add fr
-fn add_generic_locales<'a, L: AsRef<str>>(locales: &'a [L]) -> Vec<&'a str> {
+fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
     let mut v = Vec::with_capacity(locales.len() + 1);
 
     for l in locales {

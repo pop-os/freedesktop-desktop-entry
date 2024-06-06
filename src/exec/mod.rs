@@ -99,7 +99,7 @@ impl<'a> DesktopEntry<'a> {
             } else {
                 cmd
             }
-            .args(&["-c", &exec_args])
+            .args(["-c", &exec_args])
             .spawn()?
             .try_wait()?
         };
@@ -131,17 +131,17 @@ impl<'a> DesktopEntry<'a> {
         for arg in exec_args {
             match arg {
                 ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
-                    if let Some(arg) = uris.get(0) {
+                    if let Some(arg) = uris.first() {
                         final_args.push(Cow::Borrowed(arg));
                     }
                 }
                 ArgOrFieldCode::FileList | ArgOrFieldCode::UrlList => {
-                    uris.into_iter()
+                    uris.iter()
                         .for_each(|uri| final_args.push(Cow::Borrowed(uri)));
                 }
                 ArgOrFieldCode::IconKey => {
                     if let Some(icon) = self.icon() {
-                        final_args.push(Cow::Borrowed(&icon));
+                        final_args.push(Cow::Borrowed(icon));
                     }
                 }
                 ArgOrFieldCode::TranslatedName => {
@@ -153,7 +153,7 @@ impl<'a> DesktopEntry<'a> {
                     final_args.push(self.path.to_string_lossy());
                 }
                 ArgOrFieldCode::Arg(arg) => {
-                    final_args.push(Cow::Borrowed(&arg));
+                    final_args.push(Cow::Borrowed(arg));
                 }
             }
         }
@@ -244,8 +244,8 @@ mod test {
     use crate::exec::with_non_default_gpu;
     use crate::{get_languages_from_env, DesktopEntry};
     use speculoos::prelude::*;
-    use std::fs;
-    use std::path::{Path, PathBuf};
+
+    use std::path::PathBuf;
     use std::process::Command;
 
     #[test]

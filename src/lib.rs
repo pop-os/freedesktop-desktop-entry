@@ -36,7 +36,7 @@ pub struct DesktopEntry<'a> {
 impl DesktopEntry<'_> {
     /// Construct a new [`DesktopEntry`] from an appid. The name field will be
     /// set to that appid.
-    pub fn from_appid<'a>(appid: &'a str) -> DesktopEntry<'a> {
+    pub fn from_appid(appid: &str) -> DesktopEntry<'_> {
         let mut de = DesktopEntry {
             appid: Cow::Borrowed(appid),
             groups: Groups::default(),
@@ -78,12 +78,10 @@ impl<'a> DesktopEntry<'a> {
         DesktopEntry {
             appid: Cow::Owned(self.appid.to_string()),
             groups: new_groups,
-            ubuntu_gettext_domain: if let Some(ubuntu_gettext_domain) = &self.ubuntu_gettext_domain
-            {
-                Some(Cow::Owned(ubuntu_gettext_domain.to_string()))
-            } else {
-                None
-            },
+            ubuntu_gettext_domain: self
+                .ubuntu_gettext_domain
+                .as_ref()
+                .map(|ubuntu_gettext_domain| Cow::Owned(ubuntu_gettext_domain.to_string())),
             path: Cow::Owned(self.path.to_path_buf()),
         }
     }
@@ -94,9 +92,9 @@ impl<'a> DesktopEntry<'a> {
         self.appid.as_ref()
     }
 
-    /// A desktop entry field is any field under the `[Desktop Entry]` section.
+    /// A desktop entry field if any field under the `[Desktop Entry]` section.
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key).map(|e| e.as_ref())
+        Self::entry(self.groups.get("Desktop Entry"), key)
     }
 
     pub fn desktop_entry_localized<L: AsRef<str>>(
@@ -267,13 +265,7 @@ impl<'a> DesktopEntry<'a> {
         key: &str,
         locales: &[L],
     ) -> Option<Cow<'a, str>> {
-        let Some(group) = group else {
-            return None;
-        };
-
-        let Some((default_value, locale_map)) = group.get(key) else {
-            return None;
-        };
+        let (default_value, locale_map) = group?.get(key)?;
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
@@ -288,9 +280,9 @@ impl<'a> DesktopEntry<'a> {
             }
         }
         if let Some(domain) = ubuntu_gettext_domain {
-            return Some(Cow::Owned(dgettext(domain, &default_value)));
+            return Some(Cow::Owned(dgettext(domain, default_value)));
         }
-        return Some(default_value.clone());
+        Some(default_value.clone())
     }
 }
 
