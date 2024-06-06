@@ -56,9 +56,7 @@ impl<'a> DesktopEntry<'a> {
         let exec = if let Some(unquoted_exec) = exec.strip_prefix('\"') {
             unquoted_exec
                 .strip_suffix('\"')
-                .ok_or(ExecError::UnmatchedQuote {
-                    exec: exec.to_string(),
-                })?
+                .ok_or(ExecError::WrongFormat("unmatched quote".into()))?
         } else {
             exec
         };
@@ -259,7 +257,7 @@ mod test {
 
         assert_that!(result)
             .is_err()
-            .matches(|err| matches!(err, ExecError::UnmatchedQuote { exec: _ }));
+            .matches(|err| matches!(err, ExecError::WrongFormat(..)));
     }
 
     #[test]

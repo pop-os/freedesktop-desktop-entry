@@ -5,12 +5,12 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-const VULKAN_ICD_PATH: &str = std::env!(
-    "VULKAN_ICD_PATH",
-    "must define system Vulkan ICD path (ex: `/usr/share/vulkan/icd.d`)"
-);
+// const VULKAN_ICD_PATH: &str = std::env!(
+//     "VULKAN_ICD_PATH",
+//     "must define system Vulkan ICD path (ex: `/usr/share/vulkan/icd.d`)"
+// );
 
 #[derive(Debug, Default)]
 pub struct Gpus {
@@ -96,7 +96,8 @@ impl Dev {
             .expect("local data dir does not exists")
             .join("vulkan/icd.d");
 
-        let vulkan_icd_paths = &[Path::new(VULKAN_ICD_PATH), vulkan_icd_paths.as_path()];
+        // Path::new(VULKAN_ICD_PATH)
+        let vulkan_icd_paths = &[vulkan_icd_paths.as_path()];
 
         let mut icd_paths = vec![];
         if let Some(driver) = self.driver.as_str() {

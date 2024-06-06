@@ -7,10 +7,10 @@ use crate::DesktopEntry;
 use std::collections::HashMap;
 use zbus::blocking::Connection;
 use zbus::names::OwnedBusName;
+use zbus::proxy;
 use zbus::zvariant::{OwnedValue, Str};
-use zbus::{connection, interface};
 
-#[interface(name = "org.freedesktop.Application")]
+#[proxy(interface = "org.freedesktop.Application")]
 trait Application {
     fn activate(&self, platform_data: HashMap<String, OwnedValue>) -> zbus::Result<()>;
     fn activate_action(

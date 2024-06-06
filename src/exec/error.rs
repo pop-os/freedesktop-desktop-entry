@@ -8,6 +8,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ExecError<'a> {
+    #[error("{0}")]
+    WrongFormat(String),
+
     #[error("Exec string is empty")]
     EmptyExecString,
 
@@ -43,5 +46,4 @@ pub enum ExecError<'a> {
 
     #[error("Failed to launch aplication via dbus: {0}")]
     DBusError(#[from] zbus::Error),
-
 }

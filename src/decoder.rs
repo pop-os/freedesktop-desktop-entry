@@ -68,10 +68,7 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return an owned [`DesktopEntry`]
-    pub fn from_path<L>(
-        path: PathBuf,
-        locales: &[L],
-    ) -> Result<DesktopEntry<'static>, DecodeError>
+    pub fn from_path<L>(path: PathBuf, locales: &[L]) -> Result<DesktopEntry<'static>, DecodeError>
     where
         L: AsRef<str>,
     {
