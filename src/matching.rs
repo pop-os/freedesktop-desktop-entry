@@ -3,6 +3,8 @@
 
 use std::cmp::max;
 
+use log::warn;
+
 use crate::DesktopEntry;
 
 #[inline]
@@ -95,14 +97,25 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 /// From 0 to 1.
 /// 1 is a perfect match.
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
-    let de_id = de.appid.to_lowercase();
-    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
 
-    *[de_id, de_wm_class]
-        .map(|de| compare_str(pattern, &de))
+    let mut de_inputs = Vec::with_capacity(4);
+    de_inputs.push(de.appid.to_lowercase());
+    if let Some(i) = de.startup_wm_class() {
+        de_inputs.push(i.to_lowercase());
+    }
+    if let Some(i) = de.desktop_entry("Name") {
+        de_inputs.push(i.to_lowercase());
+    }
+
+    if let Some(i) = de.exec() {
+        de_inputs.push(i.to_lowercase());
+    }
+
+    de_inputs
         .iter()
+        .map(|de| compare_str(pattern, &de))
         .max_by(|e1, e2| e1.total_cmp(e2))
-        .unwrap_or(&0.0)
+        .unwrap_or(0.0)
 }
 
 #[derive(Debug, Clone)]
@@ -121,7 +134,7 @@ pub struct MatchAppIdOptions {
 impl Default for MatchAppIdOptions {
     fn default() -> Self {
         Self {
-            min_score: 0.7,
+            min_score: 0.6,
             entropy: Some((0.15, 0.2)),
         }
     }
@@ -143,6 +156,9 @@ where
 
     let normalized_patterns = patterns
         .iter()
+        .inspect(|e| {
+            warn!("searching with {}", e.as_ref());
+        })
         .map(|e| e.as_ref().to_lowercase())
         .collect::<Vec<_>>();
 
@@ -155,12 +171,25 @@ where
 
         match max_score {
             Some((prev_max_score, _)) => {
+                warn!(
+                    "found {} for {}. Score: {}",
+                    de.appid,
+                    patterns[0].as_ref(),
+                    score
+                );
+
                 if prev_max_score < score {
                     second_max_score = prev_max_score;
                     max_score = Some((score, de));
                 }
             }
             None => {
+                warn!(
+                    "found: {} for {}. Score: {}",
+                    de.appid,
+                    patterns[0].as_ref(),
+                    score
+                );
                 max_score = Some((score, de));
             }
         }
