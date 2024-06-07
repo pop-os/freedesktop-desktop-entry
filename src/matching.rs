@@ -171,14 +171,13 @@ where
 
         match max_score {
             Some((prev_max_score, _)) => {
-                warn!(
-                    "found {} for {}. Score: {}",
-                    de.appid,
-                    patterns[0].as_ref(),
-                    score
-                );
-
                 if prev_max_score < score {
+                    warn!(
+                        "found {} for {}. Score: {}",
+                        de.appid,
+                        patterns[0].as_ref(),
+                        score
+                    );
                     second_max_score = prev_max_score;
                     max_score = Some((score, de));
                 }
