@@ -42,7 +42,6 @@ impl PartialEq for DesktopEntry<'_> {
     }
 }
 
-
 impl DesktopEntry<'_> {
     /// Construct a new [`DesktopEntry`] from an appid. The name field will be
     /// set to that appid.
@@ -314,12 +313,12 @@ impl<'a> DesktopEntry<'a> {
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
                 Some(value) => {
-                    return Some(value.split(';').map(|e| Cow::Borrowed(e)).collect());
+                    return Some(value.split(';').map(Cow::Borrowed).collect());
                 }
                 None => {
                     if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
                         if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                            return Some(value.split(';').map(|e| Cow::Borrowed(e)).collect());
+                            return Some(value.split(';').map(Cow::Borrowed).collect());
                         }
                     }
                 }
@@ -334,7 +333,7 @@ impl<'a> DesktopEntry<'a> {
             );
         }
 
-        Some(default_value.split(';').map(|e| Cow::Borrowed(e)).collect())
+        Some(default_value.split(';').map(Cow::Borrowed).collect())
     }
 }
 

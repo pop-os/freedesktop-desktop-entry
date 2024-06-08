@@ -3,7 +3,7 @@
 
 use std::cmp::max;
 
-use log::warn;
+use log::debug;
 
 use crate::DesktopEntry;
 
@@ -100,22 +100,17 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     // (pattern, malus)
     let mut de_inputs = Vec::with_capacity(4);
 
-    // todo: use https://crates.io/crates/unicase ?
-
     let id = de.appid.to_lowercase();
 
     if let Some(last_part_of_id) = id.split('.').last() {
         de_inputs.push((last_part_of_id.to_owned(), 0.));
     }
-    
+
     de_inputs.push((id, 0.));
 
     if let Some(i) = de.startup_wm_class() {
         de_inputs.push((i.to_lowercase(), 0.));
     }
-    // if let Some(i) = de.desktop_entry("Name") {
-    //     de_inputs.push(i.to_lowercase());
-    // }
 
     if let Some(i) = de.exec() {
         de_inputs.push((i.to_lowercase(), 0.06));
@@ -127,11 +122,6 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(0.0)
 }
-
-
-// first match appid
-// match startup_wm_class
-// match 
 
 #[derive(Debug, Clone)]
 pub struct MatchAppIdOptions {
@@ -155,8 +145,6 @@ impl Default for MatchAppIdOptions {
     }
 }
 
-
-
 /// Return the best match over all provided [`DesktopEntry`].
 /// Use this to match over the values provided by the compositor, not the user.
 /// First entries get the priority.
@@ -175,7 +163,7 @@ where
         .iter()
         .map(|e| e.as_ref().to_lowercase())
         .inspect(|e| {
-            warn!("searching with {}", e);
+            debug!("searching with {}", e);
         })
         .collect::<Vec<_>>();
 
@@ -189,7 +177,7 @@ where
         match max_score {
             Some((prev_max_score, _)) => {
                 if prev_max_score < score {
-                    warn!(
+                    debug!(
                         "found {} for {}. Score: {}",
                         de.appid,
                         patterns[0].as_ref(),
@@ -200,7 +188,7 @@ where
                 }
             }
             None => {
-                warn!(
+                debug!(
                     "found: {} for {}. Score: {}",
                     de.appid,
                     patterns[0].as_ref(),
@@ -234,30 +222,27 @@ where
     }
 }
 
-
+#[cfg(test)]
 mod test {
-    use crate::{default_paths, get_languages_from_env, DesktopEntry, Iter};
+    use crate::{default_paths, get_languages_from_env, matching::compare_str, DesktopEntry, Iter};
 
     use super::{get_best_match, MatchAppIdOptions};
 
     #[test]
     fn find_de() {
-    
-    
-        let entries = DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env()).filter_map(|e| e.ok()).collect::<Vec<_>>();
+        let entries =
+            DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env())
+                .filter_map(|e| e.ok())
+                .collect::<Vec<_>>();
 
         let e = get_best_match(&["gnome-disks"], &entries, MatchAppIdOptions::default());
 
         println!("found {}", e.unwrap().appid);
-        // panic!()
-    }   
-    
-}
+    }
+    #[test]
+    fn a() {
+        let res = compare_str("org.gnome.tweaks", "gnome.disks");
 
-#[test]
-fn a() {
-    
-    let res = compare_str("org.gnome.tweaks", "gnome.disks");
-
-    println!("{res}")
+        println!("{res}")
+    }
 }
