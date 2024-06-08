@@ -1,4 +1,9 @@
+// Copyright 2021 System76 <info@system76.com>
+// SPDX-License-Identifier: MPL-2.0
+
 use std::cmp::max;
+
+use log::debug;
 
 use crate::DesktopEntry;
 
@@ -14,59 +19,67 @@ where
     Q: AsRef<str>,
     L: AsRef<str>,
 {
-    // let the user do this ?
-    let query = query.as_ref().to_lowercase();
+    #[inline]
+    fn add_value(v: &mut Vec<String>, value: &str, is_multiple: bool) {
+        if is_multiple {
+            value.split(';').for_each(|e| v.push(e.to_lowercase()));
+        } else {
+            v.push(value.to_lowercase());
+        }
+    }
 
-    // todo: cache all this ?
-
-    let fields = ["Name", "GenericName", "Comment", "Categories", "Keywords"];
-    let fields_not_translatable = ["Exec", "StartupWMClass"];
+    // (field name, is separated by ";")
+    let fields = [
+        ("Name", false),
+        ("GenericName", false),
+        ("Comment", false),
+        ("Categories", true),
+        ("Keywords", true),
+    ];
 
     let mut normalized_values: Vec<String> = Vec::new();
 
     normalized_values.extend(additional_values.iter().map(|val| val.to_lowercase()));
 
-    let de_id = entry.appid.to_lowercase();
-    let de_wm_class = entry.startup_wm_class().unwrap_or_default().to_lowercase();
-
-    normalized_values.push(de_id);
-    normalized_values.push(de_wm_class);
-
     let desktop_entry_group = entry.groups.get("Desktop Entry");
 
-    for field in fields_not_translatable {
-        if let Some(e) = DesktopEntry::entry(desktop_entry_group, field) {
-            normalized_values.push(e.to_lowercase());
-        }
-    }
+    for field in fields {
+        if let Some(group) = desktop_entry_group {
+            if let Some((default_value, locale_map)) = group.get(field.0) {
+                add_value(&mut normalized_values, default_value, field.1);
 
-    for locale in locales {
-        for field in fields {
-            if let Some(group) = desktop_entry_group {
-                if let Some((default_value, locale_map)) = group.get(field) {
+                let mut at_least_one_locale = false;
+
+                for locale in locales {
                     match locale_map.get(locale.as_ref()) {
                         Some(value) => {
-                            normalized_values.push(value.to_lowercase());
+                            add_value(&mut normalized_values, value, field.1);
+                            at_least_one_locale = true;
                         }
                         None => {
                             if let Some(pos) = locale.as_ref().find('_') {
                                 if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                                    normalized_values.push(value.to_lowercase());
+                                    add_value(&mut normalized_values, value, field.1);
+                                    at_least_one_locale = true;
                                 }
                             }
                         }
                     }
+                }
 
+                if !at_least_one_locale {
                     if let Some(domain) = &entry.ubuntu_gettext_domain {
-                        let gettext_value = crate::dgettext(domain, &default_value);
+                        let gettext_value = crate::dgettext(domain, default_value);
                         if !gettext_value.is_empty() {
-                            normalized_values.push(gettext_value.to_lowercase());
+                            add_value(&mut normalized_values, &gettext_value, false);
                         }
                     }
                 }
             }
         }
     }
+
+    let query = query.as_ref().to_lowercase();
 
     normalized_values
         .into_iter()
@@ -84,15 +97,30 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 /// From 0 to 1.
 /// 1 is a perfect match.
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
-    let de_id = de.appid.to_lowercase();
-    let de_wm_class = de.startup_wm_class().unwrap_or_default().to_lowercase();
-    let de_name = de.name(&[] as &[&str]).unwrap_or_default().to_lowercase();
+    // (pattern, malus)
+    let mut de_inputs = Vec::with_capacity(4);
 
-    *[de_id, de_wm_class, de_name]
-        .map(|de| compare_str(pattern, &de))
+    let id = de.appid.to_lowercase();
+
+    if let Some(last_part_of_id) = id.split('.').last() {
+        de_inputs.push((last_part_of_id.to_owned(), 0.06));
+    }
+
+    de_inputs.push((id, 0.));
+
+    if let Some(i) = de.startup_wm_class() {
+        de_inputs.push((i.to_lowercase(), 0.));
+    }
+
+    if let Some(i) = de.exec() {
+        de_inputs.push((i.to_lowercase(), 0.06));
+    }
+
+    de_inputs
         .iter()
+        .map(|de| (compare_str(pattern, &de.0) - de.1).max(0.))
         .max_by(|e1, e2| e1.total_cmp(e2))
-        .unwrap_or(&0.0)
+        .unwrap_or(0.0)
 }
 
 #[derive(Debug, Clone)]
@@ -111,14 +139,15 @@ pub struct MatchAppIdOptions {
 impl Default for MatchAppIdOptions {
     fn default() -> Self {
         Self {
-            min_score: 0.7,
-            entropy: Some((0.15, 0.2)),
+            min_score: 0.15,
+            entropy: Some((0.15, 0.1)),
         }
     }
 }
 
 /// Return the best match over all provided [`DesktopEntry`].
 /// Use this to match over the values provided by the compositor, not the user.
+/// First entries get the priority.
 pub fn get_best_match<'a, I>(
     patterns: &[I],
     entries: &'a [DesktopEntry<'a>],
@@ -133,6 +162,9 @@ where
     let normalized_patterns = patterns
         .iter()
         .map(|e| e.as_ref().to_lowercase())
+        .inspect(|e| {
+            debug!("searching with {}", e);
+        })
         .collect::<Vec<_>>();
 
     for de in entries {
@@ -145,11 +177,23 @@ where
         match max_score {
             Some((prev_max_score, _)) => {
                 if prev_max_score < score {
+                    debug!(
+                        "found {} for {}. Score: {}",
+                        de.appid,
+                        patterns[0].as_ref(),
+                        score
+                    );
                     second_max_score = prev_max_score;
                     max_score = Some((score, de));
                 }
             }
             None => {
+                debug!(
+                    "found: {} for {}. Score: {}",
+                    de.appid,
+                    patterns[0].as_ref(),
+                    score
+                );
                 max_score = Some((score, de));
             }
         }
@@ -175,5 +219,30 @@ where
         }
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{default_paths, get_languages_from_env, matching::compare_str, DesktopEntry, Iter};
+
+    use super::{get_best_match, MatchAppIdOptions};
+
+    #[test]
+    fn find_de() {
+        let entries =
+            DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env())
+                .filter_map(|e| e.ok())
+                .collect::<Vec<_>>();
+
+        let e = get_best_match(&["gnome-disks"], &entries, MatchAppIdOptions::default());
+
+        println!("found {}", e.unwrap().appid);
+    }
+    #[test]
+    fn a() {
+        let res = compare_str("org.gnome.tweaks", "gnome.disks");
+
+        println!("{res}")
     }
 }

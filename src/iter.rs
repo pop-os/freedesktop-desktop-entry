@@ -37,7 +37,6 @@ impl Iterator for Iter {
                             Err(_) => continue,
                         }
                     }
-                
 
                     return None;
                 }
