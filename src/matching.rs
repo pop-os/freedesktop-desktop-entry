@@ -118,7 +118,7 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     // }
 
     if let Some(i) = de.exec() {
-        de_inputs.push((i.to_lowercase(), 0.5));
+        de_inputs.push((i.to_lowercase(), 0.06));
     }
 
     de_inputs
