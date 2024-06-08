@@ -1,5 +1,0 @@
-[Desktop Entry]
-Exec=glxgears -info
-Terminal=true
-Type=Application
-Name=GlxGearTerminal

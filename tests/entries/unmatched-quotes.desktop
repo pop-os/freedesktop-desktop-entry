@@ -1,5 +1,0 @@
-[Desktop Entry]
-Exec="alacritty -e
-Terminal=false
-Type=Application
-Name=InvalidCommand
