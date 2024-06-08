@@ -98,14 +98,23 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 /// 1 is a perfect match.
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     let mut de_inputs = Vec::with_capacity(4);
-    de_inputs.push(de.appid.to_lowercase());
+
+    // todo: use https://crates.io/crates/unicase ?
+
+    let id = de.appid.to_lowercase();
+
+    if let Some(last_part_of_id) = id.split('.').last() {
+        de_inputs.push(last_part_of_id.to_owned());
+    }
+    
+    de_inputs.push(id);
 
     if let Some(i) = de.startup_wm_class() {
         de_inputs.push(i.to_lowercase());
     }
-    if let Some(i) = de.desktop_entry("Name") {
-        de_inputs.push(i.to_lowercase());
-    }
+    // if let Some(i) = de.desktop_entry("Name") {
+    //     de_inputs.push(i.to_lowercase());
+    // }
 
     de_inputs
         .iter()
@@ -135,6 +144,8 @@ impl Default for MatchAppIdOptions {
         }
     }
 }
+
+
 
 /// Return the best match over all provided [`DesktopEntry`].
 /// Use this to match over the values provided by the compositor, not the user.
@@ -211,4 +222,35 @@ where
     } else {
         None
     }
+}
+
+
+mod test {
+    use crate::{default_paths, get_languages_from_env, DesktopEntry, Iter};
+
+    use super::{get_best_match, MatchAppIdOptions};
+
+    #[test]
+    fn find_de() {
+    
+    
+        let entries = DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env()).filter_map(|e| e.ok()).collect::<Vec<_>>();
+
+        let e = get_best_match(&["firefox"], &entries, MatchAppIdOptions::default());
+
+        dbg!(e);
+        panic!()
+    }   
+    
+}
+
+#[test]
+fn a() {
+    
+    let id = "org.gnome.gedit";
+
+    let a = id.split('.').last().unwrap();
+
+    dbg!(a);
+    panic!();
 }
