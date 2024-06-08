@@ -97,17 +97,13 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 /// From 0 to 1.
 /// 1 is a perfect match.
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
-
     let mut de_inputs = Vec::with_capacity(4);
     de_inputs.push(de.appid.to_lowercase());
+
     if let Some(i) = de.startup_wm_class() {
         de_inputs.push(i.to_lowercase());
     }
     if let Some(i) = de.desktop_entry("Name") {
-        de_inputs.push(i.to_lowercase());
-    }
-
-    if let Some(i) = de.exec() {
         de_inputs.push(i.to_lowercase());
     }
 
@@ -134,8 +130,8 @@ pub struct MatchAppIdOptions {
 impl Default for MatchAppIdOptions {
     fn default() -> Self {
         Self {
-            min_score: 0.6,
-            entropy: Some((0.15, 0.2)),
+            min_score: 0.15,
+            entropy: Some((0.15, 0.1)),
         }
     }
 }

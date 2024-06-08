@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod decoder;
-mod exec;
-pub use exec::error::ExecError;
 mod iter;
 
 pub mod matching;
