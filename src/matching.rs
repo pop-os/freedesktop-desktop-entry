@@ -97,6 +97,7 @@ fn compare_str<'a>(pattern: &'a str, de_value: &'a str) -> f64 {
 /// From 0 to 1.
 /// 1 is a perfect match.
 fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
+    // (pattern, malus)
     let mut de_inputs = Vec::with_capacity(4);
 
     // todo: use https://crates.io/crates/unicase ?
@@ -104,24 +105,33 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     let id = de.appid.to_lowercase();
 
     if let Some(last_part_of_id) = id.split('.').last() {
-        de_inputs.push(last_part_of_id.replace('-', "."));
+        de_inputs.push((last_part_of_id.to_owned(), 0.));
     }
     
-    de_inputs.push(id.replace('-', "."));
+    de_inputs.push((id, 0.));
 
     if let Some(i) = de.startup_wm_class() {
-        de_inputs.push(i.to_lowercase().replace('-', "."));
+        de_inputs.push((i.to_lowercase(), 0.));
     }
     // if let Some(i) = de.desktop_entry("Name") {
     //     de_inputs.push(i.to_lowercase());
     // }
 
+    if let Some(i) = de.exec() {
+        de_inputs.push((i.to_lowercase(), 0.5));
+    }
+
     de_inputs
         .iter()
-        .map(|de| compare_str(pattern, &de))
+        .map(|de| (compare_str(pattern, &de.0) - de.1).max(0.))
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(0.0)
 }
+
+
+// first match appid
+// match startup_wm_class
+// match 
 
 #[derive(Debug, Clone)]
 pub struct MatchAppIdOptions {
@@ -163,7 +173,7 @@ where
 
     let normalized_patterns = patterns
         .iter()
-        .map(|e| e.as_ref().to_lowercase().replace('-', "."))
+        .map(|e| e.as_ref().to_lowercase())
         .inspect(|e| {
             warn!("searching with {}", e);
         })
@@ -236,10 +246,10 @@ mod test {
     
         let entries = DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env()).filter_map(|e| e.ok()).collect::<Vec<_>>();
 
-        let e = get_best_match(&["firefox"], &entries, MatchAppIdOptions::default());
+        let e = get_best_match(&["gnome-disks"], &entries, MatchAppIdOptions::default());
 
-        dbg!(e);
-        panic!()
+        println!("found {}", e.unwrap().appid);
+        // panic!()
     }   
     
 }
@@ -247,10 +257,7 @@ mod test {
 #[test]
 fn a() {
     
-    let id = "org.gnome.gedit";
+    let res = compare_str("org.gnome.tweaks", "gnome.disks");
 
-    let a = id.split('.').last().unwrap();
-
-    dbg!(a);
-    panic!();
+    println!("{res}")
 }
