@@ -7,15 +7,6 @@ use log::debug;
 
 use crate::DesktopEntry;
 
-#[inline]
-fn add_value(v: &mut Vec<String>, value: &str, is_multiple: bool) {
-    if is_multiple {
-        value.split(';').for_each(|e| v.push(e.to_lowercase()));
-    } else {
-        v.push(value.to_lowercase());
-    }
-}
-
 /// The returned value is between 0.0 and 1.0 (higher value means more similar).
 /// You can use the `additional_values` parameter to add runtime string.
 pub fn get_entry_score<'a, Q, L>(
@@ -28,6 +19,15 @@ where
     Q: AsRef<str>,
     L: AsRef<str>,
 {
+    #[inline]
+    fn add_value(v: &mut Vec<String>, value: &str, is_multiple: bool) {
+        if is_multiple {
+            value.split(';').for_each(|e| v.push(e.to_lowercase()));
+        } else {
+            v.push(value.to_lowercase());
+        }
+    }
+
     // (field name, is separated by ";")
     let fields = [
         ("Name", false),
@@ -103,7 +103,7 @@ fn match_entry_from_id(pattern: &str, de: &DesktopEntry) -> f64 {
     let id = de.appid.to_lowercase();
 
     if let Some(last_part_of_id) = id.split('.').last() {
-        de_inputs.push((last_part_of_id.to_owned(), 0.));
+        de_inputs.push((last_part_of_id.to_owned(), 0.06));
     }
 
     de_inputs.push((id, 0.));
