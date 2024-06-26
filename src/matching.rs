@@ -81,9 +81,20 @@ where
 
     let query = query.as_ref().to_lowercase();
 
+    let query_espaced = query.split_ascii_whitespace().collect::<Vec<_>>();
+
     normalized_values
         .into_iter()
-        .map(|de| strsim::jaro_winkler(&query, &de))
+        .map(|de_field| {
+            let jaro_score = strsim::jaro_winkler(&query, &de_field);
+
+            if query_espaced.iter().any(|query| de_field.contains(*query)) {
+                // provide a bonus if the query is contained in the de field
+                (jaro_score + 0.1).clamp(0.61, 1.)
+            } else {
+                jaro_score
+            }
+        })
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(0.0)
 }
