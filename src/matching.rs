@@ -20,46 +20,47 @@ where
     L: AsRef<str>,
 {
     #[inline]
-    fn add_value(v: &mut Vec<String>, value: &str, is_multiple: bool) {
+    fn add_value(v: &mut Vec<(String, f64)>, value: &str, is_multiple: bool, malus: f64) {
         if is_multiple {
-            value.split(';').for_each(|e| v.push(e.to_lowercase()));
+            value.split(';').for_each(|e| v.push((e.to_lowercase(), malus)));
         } else {
-            v.push(value.to_lowercase());
+            v.push((value.to_lowercase(), malus));
         }
     }
 
-    // (field name, is separated by ";")
+    // (field name, is separated by ";", malus)
     let fields = [
-        ("Name", false),
-        ("GenericName", false),
-        ("Comment", false),
-        ("Categories", true),
-        ("Keywords", true),
+        ("Name", false, 0.),
+        ("GenericName", false, 0.3),
+        ("Comment", false, 0.5),
+        ("Categories", true, 0.6),
+        ("Keywords", true, 0.5),
     ];
 
-    let mut normalized_values: Vec<String> = Vec::new();
+    // (pattern, malus)
+    let mut normalized_values: Vec<(String, f64)> = Vec::new();
 
-    normalized_values.extend(additional_values.iter().map(|val| val.to_lowercase()));
+    normalized_values.extend(additional_values.iter().map(|val| (val.to_lowercase(), 0.)));
 
     let desktop_entry_group = entry.groups.get("Desktop Entry");
 
     for field in fields {
         if let Some(group) = desktop_entry_group {
             if let Some((default_value, locale_map)) = group.get(field.0) {
-                add_value(&mut normalized_values, default_value, field.1);
+                add_value(&mut normalized_values, default_value, field.1, field.2);
 
                 let mut at_least_one_locale = false;
 
                 for locale in locales {
                     match locale_map.get(locale.as_ref()) {
                         Some(value) => {
-                            add_value(&mut normalized_values, value, field.1);
+                            add_value(&mut normalized_values, value, field.1, field.2);
                             at_least_one_locale = true;
                         }
                         None => {
                             if let Some(pos) = locale.as_ref().find('_') {
                                 if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                                    add_value(&mut normalized_values, value, field.1);
+                                    add_value(&mut normalized_values, value, field.1, field.2);
                                     at_least_one_locale = true;
                                 }
                             }
@@ -71,7 +72,7 @@ where
                     if let Some(domain) = &entry.ubuntu_gettext_domain {
                         let gettext_value = crate::dgettext(domain, default_value);
                         if !gettext_value.is_empty() {
-                            add_value(&mut normalized_values, &gettext_value, false);
+                            add_value(&mut normalized_values, &gettext_value, false, field.2);
                         }
                     }
                 }
@@ -83,7 +84,7 @@ where
 
     normalized_values
         .into_iter()
-        .map(|de| strsim::jaro_winkler(&query, &de))
+        .map(|de| strsim::jaro_winkler(&query, &de.0) - de.1)
         .max_by(|e1, e2| e1.total_cmp(e2))
         .unwrap_or(0.0)
 }
