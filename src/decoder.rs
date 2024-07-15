@@ -25,7 +25,7 @@ impl<'a> DesktopEntry<'a> {
     pub fn from_str<L>(
         path: &'a Path,
         input: &'a str,
-        locales: Option<&[L]>,
+        locales_filter: Option<&[L]>,
     ) -> Result<DesktopEntry<'a>, DecodeError>
     where
         L: AsRef<str>,
@@ -36,7 +36,7 @@ impl<'a> DesktopEntry<'a> {
         let mut active_group = Cow::Borrowed("");
         let mut ubuntu_gettext_domain = None;
 
-        let locales = locales.map(add_generic_locales);
+        let locales_filter = locales_filter.map(add_generic_locales);
 
         for line in input.lines() {
             process_line(
@@ -44,7 +44,7 @@ impl<'a> DesktopEntry<'a> {
                 &mut groups,
                 &mut active_group,
                 &mut ubuntu_gettext_domain,
-                locales.as_deref(),
+                locales_filter.as_deref(),
                 Cow::Borrowed,
             )
         }
@@ -59,25 +59,25 @@ impl<'a> DesktopEntry<'a> {
 
     pub fn from_paths<'i, 'l: 'i, L>(
         paths: impl Iterator<Item = PathBuf> + 'i,
-        locales: Option<&'l [L]>,
+        locales_filter: Option<&'l [L]>,
     ) -> impl Iterator<Item = Result<DesktopEntry<'static>, DecodeError>> + 'i
     where
         L: AsRef<str>,
     {
         let mut buf = String::new();
-        let locales = locales.map(add_generic_locales);
+        let locales_filter = locales_filter.map(add_generic_locales);
 
-        paths.map(move |path| decode_from_path_with_buf(path, locales.as_deref(), &mut buf))
+        paths.map(move |path| decode_from_path_with_buf(path, locales_filter.as_deref(), &mut buf))
     }
 
     /// Return an owned [`DesktopEntry`]
-    pub fn from_path<L>(path: PathBuf, locales: Option<&[L]>) -> Result<DesktopEntry<'static>, DecodeError>
+    pub fn from_path<L>(path: PathBuf, locales_filter: Option<&[L]>) -> Result<DesktopEntry<'static>, DecodeError>
     where
         L: AsRef<str>,
     {
         let mut buf = String::new();
-        let locales = locales.map(add_generic_locales);
-        decode_from_path_with_buf(path, locales.as_deref(), &mut buf)
+        let locales_filter = locales_filter.map(add_generic_locales);
+        decode_from_path_with_buf(path, locales_filter.as_deref(), &mut buf)
     }
 }
 
@@ -158,7 +158,7 @@ fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
 #[inline]
 fn decode_from_path_with_buf<L>(
     path: PathBuf,
-    locales: Option<&[L]>,
+    locales_filter: Option<&[L]>,
     buf: &mut String,
 ) -> Result<DesktopEntry<'static>, DecodeError>
 where
@@ -180,7 +180,7 @@ where
             &mut groups,
             &mut active_group,
             &mut ubuntu_gettext_domain,
-            locales,
+            locales_filter,
             |s| Cow::Owned(s.to_owned()),
         );
         buf.clear();
