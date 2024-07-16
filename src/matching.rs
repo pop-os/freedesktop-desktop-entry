@@ -242,7 +242,7 @@ mod test {
     #[test]
     fn find_de() {
         let entries =
-            DesktopEntry::from_paths(Iter::new(default_paths()), &get_languages_from_env())
+            DesktopEntry::from_paths(Iter::new(default_paths()), Some(&get_languages_from_env()))
                 .filter_map(|e| e.ok())
                 .collect::<Vec<_>>();
 

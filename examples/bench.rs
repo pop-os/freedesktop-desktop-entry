@@ -26,7 +26,7 @@ fn bench_borrowed(it: u32) {
 
         for path in paths {
             if let Ok(bytes) = fs::read_to_string(&path) {
-                if let Ok(_entry) = DesktopEntry::from_str(&path, &bytes, &locale) {}
+                if let Ok(_entry) = DesktopEntry::from_str(&path, &bytes, Some(&locale)) {}
             }
         }
 
@@ -46,7 +46,7 @@ fn bench_owned(it: u32) {
         let now = Instant::now();
 
         for path in paths {
-            if let Ok(_entry) = DesktopEntry::from_path(path, &locale) {}
+            if let Ok(_entry) = DesktopEntry::from_path(path, Some(&locale)) {}
         }
 
         total_time += now.elapsed();
@@ -64,7 +64,7 @@ fn bench_owned_optimized(it: u32) {
 
         let now = Instant::now();
 
-        let _ = DesktopEntry::from_paths(paths, &locale)
+        let _ = DesktopEntry::from_paths(paths, Some(&locale))
             .filter_map(|e| e.ok())
             .collect::<Vec<_>>();
 
