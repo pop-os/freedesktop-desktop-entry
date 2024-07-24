@@ -5,7 +5,7 @@ mod decoder;
 mod iter;
 
 mod exec;
-pub use exec::error::ExecError;
+pub use exec::ExecError;
 
 pub mod matching;
 pub use decoder::DecodeError;
@@ -480,7 +480,7 @@ fn env_with_locale() {
     let locales = &["fr_FR"];
 
     let de = DesktopEntry::from_path(
-        PathBuf::from("tests/org.mozilla.firefox.desktop"),
+        PathBuf::from("tests_entries/org.mozilla.firefox.desktop"),
         Some(locales),
     )
     .unwrap();
