@@ -19,3 +19,8 @@ strsim = "0.11.1"
 thiserror = "1"
 xdg = "2.4.0"
 log = "0.4.21"
+udev = "0.8.0"
+zbus = "4.2.2"
+
+[dev-dependencies]
+speculoos = "0.11.0"

@@ -4,6 +4,9 @@
 mod decoder;
 mod iter;
 
+mod exec;
+pub use exec::error::ExecError;
+
 pub mod matching;
 pub use decoder::DecodeError;
 
@@ -476,8 +479,11 @@ fn add_field() {
 fn env_with_locale() {
     let locales = &["fr_FR"];
 
-    let de = DesktopEntry::from_path(PathBuf::from("tests/org.mozilla.firefox.desktop"), Some(locales))
-        .unwrap();
+    let de = DesktopEntry::from_path(
+        PathBuf::from("tests/org.mozilla.firefox.desktop"),
+        Some(locales),
+    )
+    .unwrap();
 
     assert_eq!(de.generic_name(locales).unwrap(), "Navigateur Web");
 
