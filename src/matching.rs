@@ -99,21 +99,26 @@ impl<'a> DesktopEntry<'a> {
             .max_by(|e1, e2| e1.total_cmp(e2))
             .unwrap_or(0.0)
     }
+}
 
-    /// Return true if the appid provided match this [`DesktopEntry`].
-    pub fn try_match_appid(&'a self, appid: &str) -> bool {
-        let normalized_appid = appid.to_lowercase();
+/// Return the corresponding [`DesktopEntry`] that match the given appid.
+pub fn find_entry_from_appid<'a, I>(entries: I, appid: &str) -> Option<&'a DesktopEntry<'a>>
+where
+    I: Iterator<Item = &'a DesktopEntry<'a>>,
+{
+    let normalized_appid = appid.to_lowercase();
 
-        if self.appid.to_lowercase() == normalized_appid {
+    entries.into_iter().find(|e| {
+        if e.appid.to_lowercase() == normalized_appid {
             return true;
         }
 
-        if let Some(field) = self.startup_wm_class() {
+        if let Some(field) = e.startup_wm_class() {
             if field.to_lowercase() == normalized_appid {
                 return true;
             }
         }
 
         false
-    }
+    })
 }
