@@ -42,14 +42,19 @@ impl Iterator for Iter {
                 }
             };
 
-            while let Some(entry) = iterator.next() {
+            'inner: while let Some(entry) = iterator.next() {
                 if let Ok(entry) = entry {
-                    let path = entry.path();
+                    let mut path = entry.path();
+
+                    path = match path.canonicalize() {
+                        Ok(canonicalized) => canonicalized,
+                        Err(_) => continue 'inner,
+                    };
 
                     if let Ok(file_type) = entry.file_type() {
                         if file_type.is_dir() {
                             self.directories_to_walk.push(path);
-                        } else if (file_type.is_file() || file_type.is_symlink())
+                        } else if file_type.is_file()
                             && path.extension().map_or(false, |ext| ext == "desktop")
                         {
                             self.actively_walking = Some(iterator);
