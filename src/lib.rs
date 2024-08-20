@@ -4,6 +4,7 @@
 mod decoder;
 mod iter;
 
+pub mod matching;
 pub use decoder::DecodeError;
 
 pub use self::iter::Iter;

@@ -71,7 +71,10 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return an owned [`DesktopEntry`]
-    pub fn from_path<L>(path: PathBuf, locales_filter: Option<&[L]>) -> Result<DesktopEntry<'static>, DecodeError>
+    pub fn from_path<L>(
+        path: PathBuf,
+        locales_filter: Option<&[L]>,
+    ) -> Result<DesktopEntry<'static>, DecodeError>
     where
         L: AsRef<str>,
     {
@@ -125,7 +128,11 @@ fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
                 let locale = &key[start + 1..key.len() - 1];
 
                 match locales_filter {
-                    Some(locales_filter) if !locales_filter.iter().any(|l| l.as_ref() == locale) => return,
+                    Some(locales_filter)
+                        if !locales_filter.iter().any(|l| l.as_ref() == locale) =>
+                    {
+                        return
+                    }
                     _ => (),
                 }
 
