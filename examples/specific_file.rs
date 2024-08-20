@@ -3,7 +3,7 @@ use std::path::Path;
 use freedesktop_desktop_entry::DesktopEntry;
 
 fn main() {
-    let path = Path::new("tests/org.mozilla.firefox.desktop");
+    let path = Path::new("tests_entries/org.mozilla.firefox.desktop");
     let locales = &["fr_FR", "en", "it"];
 
     // if let Ok(bytes) = fs::read_to_string(path) {
