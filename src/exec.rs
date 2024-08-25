@@ -62,10 +62,6 @@ impl<'a> DesktopEntry<'a> {
             return Err(ExecError::ExecFieldNotFound);
         };
 
-        if exec.contains('=') {
-            return Err(ExecError::WrongFormat("equal sign detected".into()));
-        }
-
         let exec = if let Some(without_prefix) = exec.strip_prefix('\"') {
             without_prefix
                 .strip_suffix('\"')
@@ -112,6 +108,10 @@ impl<'a> DesktopEntry<'a> {
 
         if args.is_empty() {
             return Err(ExecError::ExecFieldIsEmpty);
+        }
+
+        if args.first().unwrap().contains('=') {
+            return Err(ExecError::WrongFormat("equal sign detected".into()));
         }
 
         Ok(args)
