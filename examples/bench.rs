@@ -64,9 +64,7 @@ fn bench_owned_optimized(it: u32) {
 
         let now = Instant::now();
 
-        let _ = DesktopEntry::from_paths(paths, Some(&locale))
-            .filter_map(|e| e.ok())
-            .collect::<Vec<_>>();
+        let _ = paths.entries(Some(&locale)).collect::<Vec<_>>();
 
         total_time += now.elapsed();
     }

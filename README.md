@@ -6,22 +6,14 @@
 This crate provides a library for efficiently parsing [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/latest/index.html) files.
 
 ```rust
-use std::fs;
-
-use freedesktop_desktop_entry::{
-    default_paths, get_languages_from_env, DesktopEntry, Iter, PathSource,
-};
+use freedesktop_desktop_entry::{default_paths, get_languages_from_env, Iter, PathSource};
 
 fn main() {
     let locales = get_languages_from_env();
-
-    for path in Iter::new(default_paths()) {
-        let path_src = PathSource::guess_from(&path);
-        if let Ok(bytes) = fs::read_to_string(&path) {
-            if let Ok(entry) = DesktopEntry::from_str(&path, &bytes, &locales) {
-                println!("{:?}: {}\n---\n{}", path_src, path.display(), entry);
-            }
-        }
+    for entry in Iter::new(default_paths()).entries(Some(&locales)) {
+        let path_src = PathSource::guess_from(&entry.path);
+        
+        println!("{:?}: {}\n---\n{}", path_src, entry.path.display(), entry);
     }
 }
 ```
