@@ -167,10 +167,10 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return categories
-    pub fn categories(&'a self) -> Vec<&'a str> {
+    pub fn categories(&'a self) -> impl Iterator<Item = &'a str> {
         self.desktop_entry("Categories")
-            .map(|e| e.split(';').collect())
-            .unwrap_or_default()
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     /// Return keywords
@@ -179,26 +179,26 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return mime types
-    pub fn mime_type(&'a self) -> Vec<&'a str> {
+    pub fn mime_type(&'a self) -> impl Iterator<Item = &'a str> {
         self.desktop_entry("MimeType")
-            .map(|e| e.split(';').collect())
-            .unwrap_or_default()
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     pub fn no_display(&'a self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
-    pub fn only_show_in(&'a self) -> Vec<&'a str> {
+    pub fn only_show_in(&'a self) -> impl Iterator<Item = &'a str> {
         self.desktop_entry("OnlyShowIn")
-            .map(|e| e.split(';').collect())
-            .unwrap_or_default()
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
-    pub fn not_show_in(&'a self) -> Vec<&'a str> {
+    pub fn not_show_in(&'a self) -> impl Iterator<Item = &'a str> {
         self.desktop_entry("NotShowIn")
-            .map(|e| e.split(';').collect())
-            .unwrap_or_default()
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     pub fn flatpak(&'a self) -> Option<&'a str> {
@@ -225,10 +225,10 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Type")
     }
 
-    pub fn actions(&'a self) -> Vec<&'a str> {
+    pub fn actions(&'a self) -> impl Iterator<Item = &'a str> {
         self.desktop_entry("Actions")
-            .map(|e| e.split(';').collect())
-            .unwrap_or_default()
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     /// An action is defined as `[Desktop Action actions-name]` where `action-name`
@@ -331,12 +331,12 @@ impl<'a> DesktopEntry<'a> {
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
                 Some(value) => {
-                    return value.split(';').map(Cow::Borrowed).collect();
+                    return value.split_terminator(';').map(Cow::Borrowed).collect();
                 }
                 None => {
                     if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
                         if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                            return value.split(';').map(Cow::Borrowed).collect();
+                            return value.split_terminator(';').map(Cow::Borrowed).collect();
                         }
                     }
                 }
@@ -344,12 +344,15 @@ impl<'a> DesktopEntry<'a> {
         }
         if let Some(domain) = &self.ubuntu_gettext_domain {
             return dgettext(domain, default_value)
-                .split(';')
+                .split_terminator(';')
                 .map(|e| Cow::Owned(e.to_string()))
                 .collect();
         }
 
-        default_value.split(';').map(Cow::Borrowed).collect()
+        default_value
+            .split_terminator(';')
+            .map(Cow::Borrowed)
+            .collect()
     }
 }
 
@@ -455,7 +458,7 @@ pub fn get_languages_from_env() -> Vec<String> {
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
-        lang.split(':').for_each(|lang| {
+        lang.split_terminator(':').for_each(|lang| {
             l.push(lang.to_owned());
         })
     }
@@ -469,7 +472,7 @@ pub fn current_desktop() -> Option<Vec<String>> {
         if x == "unity" {
             vec!["gnome".to_string()]
         } else {
-            x.split(':').map(|e| e.to_string()).collect()
+            x.split_terminator(':').map(|e| e.to_string()).collect()
         }
     })
 }
