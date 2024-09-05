@@ -57,19 +57,6 @@ impl<'a> DesktopEntry<'a> {
         })
     }
 
-    pub fn from_paths<'i, 'l: 'i, L>(
-        paths: impl Iterator<Item = PathBuf> + 'i,
-        locales_filter: Option<&'l [L]>,
-    ) -> impl Iterator<Item = Result<DesktopEntry<'static>, DecodeError>> + 'i
-    where
-        L: AsRef<str>,
-    {
-        let mut buf = String::new();
-        let locales_filter = locales_filter.map(add_generic_locales);
-
-        paths.map(move |path| decode_from_path_with_buf(path, locales_filter.as_deref(), &mut buf))
-    }
-
     /// Return an owned [`DesktopEntry`]
     pub fn from_path<L>(
         path: PathBuf,
@@ -163,7 +150,7 @@ fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
 }
 
 #[inline]
-fn decode_from_path_with_buf<L>(
+pub(crate) fn decode_from_path_with_buf<L>(
     path: PathBuf,
     locales_filter: Option<&[L]>,
     buf: &mut String,
@@ -202,7 +189,7 @@ where
 }
 
 /// Ex: if a locale equal fr_FR, add fr
-fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
+pub(crate) fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
     let mut v = Vec::with_capacity(locales.len() + 1);
 
     for l in locales {
