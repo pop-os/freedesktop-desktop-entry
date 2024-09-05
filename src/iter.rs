@@ -56,10 +56,10 @@ impl Iterator for Iter {
                         Err(_) => continue 'inner,
                     };
 
-                    if let Ok(file_type) = entry.file_type() {
-                        if file_type.is_dir() {
+                    if let Ok(metadata) = path.metadata() {
+                        if metadata.is_dir() {
                             self.directories_to_walk.push_front(path);
-                        } else if file_type.is_file()
+                        } else if metadata.is_file()
                             && path.extension().map_or(false, |ext| ext == "desktop")
                         {
                             self.actively_walking = Some(iterator);
