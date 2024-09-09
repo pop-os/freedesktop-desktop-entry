@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 
 use std::path::{Path, PathBuf};
+use std::str::SplitTerminator;
 use xdg::BaseDirectories;
 
 pub type Group<'a> = Cow<'a, str>;
@@ -167,34 +168,38 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return categories
-    pub fn categories(&'a self) -> Option<Vec<&'a str>> {
+    pub fn categories(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("Categories")
-            .map(|e| e.split(';').collect())
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     /// Return keywords
-    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Vec<Cow<'a, str>>> {
+    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Vec<Cow<'a, str>> {
         self.localized_entry_splitted(self.groups.get("Desktop Entry"), "Keywords", locales)
     }
 
     /// Return mime types
-    pub fn mime_type(&'a self) -> Option<Vec<&'a str>> {
+    pub fn mime_type(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("MimeType")
-            .map(|e| e.split(';').collect())
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     pub fn no_display(&'a self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
-    pub fn only_show_in(&'a self) -> Option<Vec<&'a str>> {
+    pub fn only_show_in(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("OnlyShowIn")
-            .map(|e| e.split(';').collect())
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
-    pub fn not_show_in(&'a self) -> Option<Vec<&'a str>> {
+    pub fn not_show_in(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("NotShowIn")
-            .map(|e| e.split(';').collect())
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     pub fn flatpak(&'a self) -> Option<&'a str> {
@@ -221,9 +226,10 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Type")
     }
 
-    pub fn actions(&'a self) -> Option<Vec<&'a str>> {
+    pub fn actions(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("Actions")
-            .map(|e| e.split(';').collect())
+            .map(|e| e.split_terminator(';'))
+            .unwrap_or_else(|| "".split_terminator(';'))
     }
 
     /// An action is defined as `[Desktop Action actions-name]` where `action-name`
@@ -311,33 +317,43 @@ impl<'a> DesktopEntry<'a> {
         group: Option<&'a KeyMap<'a>>,
         key: &str,
         locales: &[L],
-    ) -> Option<Vec<Cow<'a, str>>> {
-        let (default_value, locale_map) = group?.get(key)?;
+    ) -> Vec<Cow<'a, str>> {
+        let (default_value, locale_map) = {
+            let Some(group) = group else {
+                return Vec::new();
+            };
+
+            let Some(group) = group.get(key) else {
+                return Vec::new();
+            };
+            group
+        };
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
                 Some(value) => {
-                    return Some(value.split(';').map(Cow::Borrowed).collect());
+                    return value.split_terminator(';').map(Cow::Borrowed).collect();
                 }
                 None => {
                     if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
                         if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                            return Some(value.split(';').map(Cow::Borrowed).collect());
+                            return value.split_terminator(';').map(Cow::Borrowed).collect();
                         }
                     }
                 }
             }
         }
         if let Some(domain) = &self.ubuntu_gettext_domain {
-            return Some(
-                dgettext(domain, default_value)
-                    .split(';')
-                    .map(|e| Cow::Owned(e.to_string()))
-                    .collect(),
-            );
+            return dgettext(domain, default_value)
+                .split_terminator(';')
+                .map(|e| Cow::Owned(e.to_string()))
+                .collect();
         }
 
-        Some(default_value.split(';').map(Cow::Borrowed).collect())
+        default_value
+            .split_terminator(';')
+            .map(Cow::Borrowed)
+            .collect()
     }
 }
 
@@ -439,7 +455,7 @@ pub fn get_languages_from_env() -> Vec<String> {
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
-        lang.split(':').for_each(|lang| {
+        lang.split_terminator(':').for_each(|lang| {
             l.push(lang.to_owned());
         })
     }
@@ -453,7 +469,7 @@ pub fn current_desktop() -> Option<Vec<String>> {
         if x == "unity" {
             vec!["gnome".to_string()]
         } else {
-            x.split(':').map(|e| e.to_string()).collect()
+            x.split_terminator(':').map(|e| e.to_string()).collect()
         }
     })
 }
