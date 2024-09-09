@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 
 use std::path::{Path, PathBuf};
+use std::str::SplitTerminator;
 use xdg::BaseDirectories;
 
 pub type Group<'a> = Cow<'a, str>;
@@ -167,7 +168,7 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return categories
-    pub fn categories(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn categories(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("Categories")
             .map(|e| e.split_terminator(';'))
             .unwrap_or_else(|| "".split_terminator(';'))
@@ -179,7 +180,7 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Return mime types
-    pub fn mime_type(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn mime_type(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("MimeType")
             .map(|e| e.split_terminator(';'))
             .unwrap_or_else(|| "".split_terminator(';'))
@@ -189,13 +190,13 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry_bool("NoDisplay")
     }
 
-    pub fn only_show_in(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn only_show_in(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("OnlyShowIn")
             .map(|e| e.split_terminator(';'))
             .unwrap_or_else(|| "".split_terminator(';'))
     }
 
-    pub fn not_show_in(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn not_show_in(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("NotShowIn")
             .map(|e| e.split_terminator(';'))
             .unwrap_or_else(|| "".split_terminator(';'))
@@ -225,7 +226,7 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Type")
     }
 
-    pub fn actions(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn actions(&'a self) -> SplitTerminator<'a, char> {
         self.desktop_entry("Actions")
             .map(|e| e.split_terminator(';'))
             .unwrap_or_else(|| "".split_terminator(';'))
