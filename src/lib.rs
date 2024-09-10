@@ -166,6 +166,15 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry("Exec")
     }
 
+    /// Path or name of an executable to check if app is really installed
+    pub fn try_exec(&'a self) -> Option<&'a str> {
+        self.desktop_entry("TryExec")
+    }
+
+    pub fn dbus_activatable(&'a self) -> bool {
+        self.desktop_entry_bool("DBusActivatable")
+    }
+
     /// Return categories
     pub fn categories(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("Categories")
@@ -183,18 +192,32 @@ impl<'a> DesktopEntry<'a> {
             .map(|e| e.split(';').collect())
     }
 
+    /// List of D-Bus interfaces supported by this application
+    pub fn implements(&'a self) -> Option<Vec<&'a str>> {
+        self.desktop_entry("Implements")
+            .map(|e| e.split(';').collect())
+    }
+
+    /// Application exists but shouldn't be shown in menus
     pub fn no_display(&'a self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
+    /// Desktop environments that should display this application
     pub fn only_show_in(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("OnlyShowIn")
             .map(|e| e.split(';').collect())
     }
 
+    /// Desktop environments that should not display this application
     pub fn not_show_in(&'a self) -> Option<Vec<&'a str>> {
         self.desktop_entry("NotShowIn")
             .map(|e| e.split(';').collect())
+    }
+
+    /// Treat application as if it does not exist
+    pub fn hidden(&'a self) -> bool {
+        self.desktop_entry_bool("Hidden")
     }
 
     pub fn flatpak(&'a self) -> Option<&'a str> {
@@ -217,8 +240,27 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry_bool("Terminal")
     }
 
+    /// The app has a single main window only
+    pub fn single_main_window(&'a self) -> bool {
+        self.desktop_entry_bool("SingleMainWindow")
+    }
+
+    /// Working directory to run program in
+    pub fn path(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Path")
+    }
+
     pub fn type_(&'a self) -> Option<&'a str> {
         self.desktop_entry("Type")
+    }
+
+    /// URL to access if entry type is Link
+    pub fn url(&'a self) -> Option<&'a str> {
+        self.desktop_entry("URL")
+    }
+    /// Supported version of the Desktop Entry Specification
+    pub fn version(&'a self) -> Option<&'a str> {
+        self.desktop_entry("Version")
     }
 
     pub fn actions(&'a self) -> Option<Vec<&'a str>> {
