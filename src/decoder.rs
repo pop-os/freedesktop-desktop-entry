@@ -26,6 +26,8 @@ pub enum DecodeError {
     InvalidKey,
     #[error("KeyDoesNotExist, this can happens when a localized key has no default value")]
     KeyDoesNotExist,
+    #[error("InvalidValue")]
+    InvalidValue,
 }
 
 impl DesktopEntry {
@@ -181,7 +183,7 @@ fn process_line<L: AsRef<str>>(
         }
     } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
         let key = &line[..delimiter];
-        let value = &line[delimiter + 1..];
+        let value = format_value(&line[delimiter + 1..])?;
 
         if key.is_empty() {
             return Err(DecodeError::InvalidKey);
@@ -207,9 +209,7 @@ fn process_line<L: AsRef<str>>(
 
                 match active_keys {
                     Some(active_keys) => {
-                        active_keys
-                            .locales
-                            .insert(locale.to_string(), value.to_string());
+                        active_keys.locales.insert(locale.to_string(), value);
                     }
                     None => return Err(DecodeError::KeyDoesNotExist),
                 }
@@ -245,11 +245,60 @@ fn process_line<L: AsRef<str>>(
         active_keys.replace(ActiveKeys {
             // todo: verify that the key only contains A-Za-z0-9 ?
             key_name: key.trim().to_string(),
-            default_value: value.trim_start().to_string(),
+            default_value: value,
             locales: LocaleMap::default(),
         });
     }
     Ok(())
+}
+
+// https://specifications.freedesktop.org/desktop-entry-spec/latest/value-types.html
+#[inline]
+fn format_value(input: &str) -> Result<String, DecodeError> {
+    let input = if let Some(input) = input.strip_prefix(" ") {
+        input
+    } else {
+        input
+    };
+
+    let mut res = String::with_capacity(input.len());
+
+    let mut last: usize = 0;
+
+    for i in memchr::memchr_iter(b'\\', input.as_bytes()) {
+        // edge case for //
+        if last > i {
+            continue;
+        }
+
+        // when there is an \ at the end
+        if input.len() < i + 1 {
+            return Err(DecodeError::InvalidValue);
+        }
+
+        if last < i {
+            res.push_str(&input[last..i]);
+        }
+
+        last = i + 2;
+
+        match input.as_bytes()[i + 1] {
+            b's' => res.push(' '),
+            b'n' => res.push('\n'),
+            b't' => res.push('\t'),
+            b'r' => res.push('\r'),
+            b'\\' => res.push('\\'),
+            _ => {
+                return Err(DecodeError::InvalidValue);
+            }
+        }
+    }
+
+    if last < input.len() {
+        res.push_str(&input[last..input.len()]);
+    }
+
+    Ok(res)
 }
 
 /// Ex: if a locale equal fr_FR, add fr
