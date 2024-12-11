@@ -5,6 +5,7 @@ mod decoder;
 mod iter;
 
 mod exec;
+use cached::proc_macro::cached;
 pub use exec::ExecError;
 
 pub mod matching;
@@ -431,6 +432,7 @@ pub(crate) fn dgettext(domain: &str, message: &str) -> String {
 
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
+#[cached]
 pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
