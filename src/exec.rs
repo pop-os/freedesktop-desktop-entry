@@ -16,7 +16,7 @@ pub enum ExecError {
     ExecFieldNotFound,
 }
 
-impl<'a> DesktopEntry<'a> {
+impl DesktopEntry {
     pub fn parse_exec(&self) -> Result<Vec<String>, ExecError> {
         self.get_args(self.exec(), &[], &[] as &[&str])
     }
@@ -24,7 +24,7 @@ impl<'a> DesktopEntry<'a> {
     /// Macros like `%f` (cf [.desktop spec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#exec-variables)) will be subtitued using the `uris` parameter.
     pub fn parse_exec_with_uris<L>(
         &self,
-        uris: &[&'a str],
+        uris: &[&str],
         locales: &[L],
     ) -> Result<Vec<String>, ExecError>
     where
@@ -40,7 +40,7 @@ impl<'a> DesktopEntry<'a> {
     pub fn parse_exec_action_with_uris<L>(
         &self,
         action_name: &str,
-        uris: &[&'a str],
+        uris: &[&str],
         locales: &[L],
     ) -> Result<Vec<String>, ExecError>
     where
@@ -50,9 +50,9 @@ impl<'a> DesktopEntry<'a> {
     }
 
     fn get_args<L>(
-        &'a self,
-        exec: Option<&'a str>,
-        uris: &[&'a str],
+        &self,
+        exec: Option<&str>,
+        uris: &[&str],
         locales: &[L],
     ) -> Result<Vec<String>, ExecError>
     where

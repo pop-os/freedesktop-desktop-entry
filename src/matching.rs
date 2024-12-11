@@ -3,14 +3,14 @@
 
 use crate::DesktopEntry;
 
-impl<'a> DesktopEntry<'a> {
+impl DesktopEntry {
     /// The returned value is between 0.0 and 1.0 (higher value means more similar).
     /// You can use the `additional_haystack_values` parameter to add relevant string that are not part of the desktop entry.
     pub fn match_query<Q, L>(
-        &'a self,
+        &self,
         query: Q,
-        locales: &'a [L],
-        additional_haystack_values: &'a [&'a str],
+        locales: &[L],
+        additional_haystack_values: &[&str],
     ) -> f64
     where
         Q: AsRef<str>,
@@ -102,9 +102,9 @@ impl<'a> DesktopEntry<'a> {
 }
 
 /// Return the corresponding [`DesktopEntry`] that match the given appid.
-pub fn find_entry_from_appid<'a, I>(entries: I, appid: &str) -> Option<&'a DesktopEntry<'a>>
+pub fn find_entry_from_appid<'a, I>(entries: I, appid: &str) -> Option<&'a DesktopEntry>
 where
-    I: IntoIterator<Item = &'a DesktopEntry<'a>>,
+    I: IntoIterator<Item = &'a DesktopEntry>,
 {
     let normalized_appid = appid.to_lowercase();
 
