@@ -104,7 +104,7 @@ impl<'a> DesktopEntry<'a> {
 /// Return the corresponding [`DesktopEntry`] that match the given appid.
 pub fn find_entry_from_appid<'a, I>(entries: I, appid: &str) -> Option<&'a DesktopEntry<'a>>
 where
-    I: Iterator<Item = &'a DesktopEntry<'a>>,
+    I: IntoIterator<Item = &'a DesktopEntry<'a>>,
 {
     let normalized_appid = appid.to_lowercase();
 
