@@ -42,11 +42,11 @@ impl<'a> DesktopEntry<'a> {
                 .map(|val| val.to_lowercase()),
         );
 
-        let desktop_entry_group = self.groups.get("Desktop Entry");
+        let desktop_entry_group = self.groups.group("Desktop Entry");
 
         for field in fields {
             if let Some(group) = desktop_entry_group {
-                if let Some((default_value, locale_map)) = group.get(field.0) {
+                if let Some((default_value, locale_map)) = group.0.get(field.0) {
                     add_value(&mut normalized_values, default_value, field.1);
 
                     let mut at_least_one_locale = false;

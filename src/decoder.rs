@@ -32,7 +32,7 @@ impl<'a> DesktopEntry<'a> {
     {
         let appid = get_app_id(path)?;
 
-        let mut groups = Groups::new();
+        let mut groups = Groups::default();
         let mut active_group = Cow::Borrowed("");
         let mut ubuntu_gettext_domain = None;
 
@@ -124,8 +124,10 @@ fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
                 }
 
                 groups
+                    .0
                     .entry(active_group.clone())
                     .or_default()
+                    .0
                     .entry(convert_to_cow(key_name))
                     .or_insert_with(|| (Cow::Borrowed(""), LocaleMap::new()))
                     .1
@@ -141,8 +143,10 @@ fn process_line<'buf, 'local_ref, 'res: 'local_ref + 'buf, F, L>(
         }
 
         groups
+            .0
             .entry(active_group.clone())
             .or_default()
+            .0
             .entry(convert_to_cow(key))
             .or_insert_with(|| (Cow::Borrowed(""), BTreeMap::new()))
             .0 = convert_to_cow(value);
@@ -162,7 +166,7 @@ where
 
     let appid = get_app_id(&path)?;
 
-    let mut groups = Groups::new();
+    let mut groups = Groups::default();
     let mut active_group = Cow::Borrowed("");
     let mut ubuntu_gettext_domain = None;
 

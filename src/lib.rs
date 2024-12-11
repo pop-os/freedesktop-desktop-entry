@@ -19,21 +19,74 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use xdg::BaseDirectories;
 
-pub type Group<'a> = Cow<'a, str>;
-pub type Groups<'a> = BTreeMap<Group<'a>, KeyMap<'a>>;
+pub type GroupName<'a> = Cow<'a, str>;
+#[derive(Debug, Clone, Default)]
+pub struct Groups<'a>(pub BTreeMap<GroupName<'a>, Group<'a>>);
+
+impl<'a> Groups<'a> {
+    pub fn desktop_entry(&self) -> Option<&Group<'a>> {
+        self.0.get("Desktop Entry")
+    }
+
+    pub fn group(&self, key: &str) -> Option<&Group<'a>> {
+        self.0.get(key)
+    }
+}
+
 pub type Key<'a> = Cow<'a, str>;
-pub type KeyMap<'a> = BTreeMap<Key<'a>, (Value<'a>, LocaleMap<'a>)>;
+#[derive(Debug, Clone, Default)]
+pub struct Group<'a>(pub BTreeMap<Key<'a>, (Value<'a>, LocaleMap<'a>)>);
+
+impl<'input> Group<'input> {
+    pub fn localized_entry<'this: 'input, 'key, L: AsRef<str>>(
+        &'this self,
+        key: &'key str,
+        locales: &[L],
+    ) -> Option<&'input str> {
+        let (default_value, locale_map) = self.0.get(key)?;
+
+        for locale in locales {
+            match locale_map.get(locale.as_ref()) {
+                Some(value) => return Some(value),
+                None => {
+                    if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
+                        if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
+                            return Some(value);
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(default_value)
+    }
+
+    pub fn entry(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(|key| key.0.as_ref())
+    }
+
+    pub fn entry_bool(&self, key: &str) -> Option<bool> {
+        match self.entry(key)? {
+            "true" => Some(true),
+            "false" => Some(false),
+            _ => None,
+        }
+    }
+}
+
 pub type Locale<'a> = Cow<'a, str>;
 pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
 pub type Value<'a> = Cow<'a, str>;
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone)]
 pub struct DesktopEntry<'a> {
     pub appid: Cow<'a, str>,
     pub groups: Groups<'a>,
     pub path: Cow<'a, Path>,
     pub ubuntu_gettext_domain: Option<Cow<'a, str>>,
 }
+
+impl Eq for DesktopEntry<'_> {}
 
 impl Hash for DesktopEntry<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -65,12 +118,12 @@ impl DesktopEntry<'_> {
 impl<'a> DesktopEntry<'a> {
     // note that we shoudn't implement ToOwned in this case: https://stackoverflow.com/questions/72105604/implement-toowned-for-user-defined-types
     pub fn to_owned(&self) -> DesktopEntry<'static> {
-        let mut new_groups = Groups::new();
+        let mut new_groups = Groups::default();
 
-        for (group, key_map) in &self.groups {
-            let mut new_key_map = KeyMap::new();
+        for (group_name, group) in &self.groups.0 {
+            let mut new_key_map = Group::default();
 
-            for (key, (value, locale_map)) in key_map {
+            for (key, (value, locale_map)) in &group.0 {
                 let mut new_locale_map = LocaleMap::new();
 
                 for (locale, value) in locale_map {
@@ -80,13 +133,15 @@ impl<'a> DesktopEntry<'a> {
                     );
                 }
 
-                new_key_map.insert(
+                new_key_map.0.insert(
                     Cow::Owned(key.to_string()),
                     (Cow::Owned(value.to_string()), new_locale_map),
                 );
             }
 
-            new_groups.insert(Cow::Owned(group.to_string()), new_key_map);
+            new_groups
+                .0
+                .insert(Cow::Owned(group_name.to_string()), new_key_map);
         }
 
         DesktopEntry {
@@ -108,7 +163,7 @@ impl<'a> DesktopEntry<'a> {
 
     /// A desktop entry field if any field under the `[Desktop Entry]` section.
     pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key)
+        Self::entry(self.groups.desktop_entry(), key)
     }
 
     pub fn desktop_entry_localized<L: AsRef<str>>(
@@ -118,7 +173,7 @@ impl<'a> DesktopEntry<'a> {
     ) -> Option<Cow<'a, str>> {
         Self::localized_entry(
             self.ubuntu_gettext_domain.as_deref(),
-            self.groups.get("Desktop Entry"),
+            self.groups.desktop_entry(),
             key,
             locales,
         )
@@ -134,14 +189,14 @@ impl<'a> DesktopEntry<'a> {
         let key = Cow::Borrowed(key);
         let value = (Cow::Borrowed(value), LocaleMap::default());
 
-        match self.groups.get_mut(action_key) {
+        match self.groups.0.get_mut(action_key) {
             Some(keymap) => {
-                keymap.insert(key, value);
+                keymap.0.insert(key, value);
             }
             None => {
-                let mut keymap = KeyMap::default();
-                keymap.insert(key, value);
-                self.groups.insert(Cow::Borrowed(action_key), keymap);
+                let mut keymap = Group::default();
+                keymap.0.insert(key, value);
+                self.groups.0.insert(Cow::Borrowed(action_key), keymap);
             }
         }
     }
@@ -175,7 +230,7 @@ impl<'a> DesktopEntry<'a> {
 
     /// Return keywords
     pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Vec<Cow<'a, str>>> {
-        self.localized_entry_splitted(self.groups.get("Desktop Entry"), "Keywords", locales)
+        self.localized_entry_splitted(self.groups.desktop_entry(), "Keywords", locales)
     }
 
     /// Return mime types
@@ -241,7 +296,7 @@ impl<'a> DesktopEntry<'a> {
     pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
         let group = self
             .groups
-            .get(["Desktop Action ", action].concat().as_str());
+            .group(["Desktop Action ", action].concat().as_str());
 
         Self::entry(group, key)
     }
@@ -254,7 +309,7 @@ impl<'a> DesktopEntry<'a> {
     ) -> Option<Cow<'a, str>> {
         let group = self
             .groups
-            .get(["Desktop Action ", action].concat().as_str());
+            .group(["Desktop Action ", action].concat().as_str());
 
         Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locales)
     }
@@ -275,19 +330,17 @@ impl<'a> DesktopEntry<'a> {
         self.desktop_entry(key).map_or(false, |v| v == "true")
     }
 
-    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
-        group
-            .and_then(|group| group.get(key))
-            .map(|key| key.0.as_ref())
+    fn entry(group: Option<&'a Group<'a>>, key: &str) -> Option<&'a str> {
+        group.and_then(|group| group.entry(key))
     }
 
     pub(crate) fn localized_entry<L: AsRef<str>>(
         ubuntu_gettext_domain: Option<&'a str>,
-        group: Option<&'a KeyMap<'a>>,
+        group: Option<&'a Group<'a>>,
         key: &str,
         locales: &[L],
     ) -> Option<Cow<'a, str>> {
-        let (default_value, locale_map) = group?.get(key)?;
+        let (default_value, locale_map) = group?.0.get(key)?;
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
@@ -309,11 +362,11 @@ impl<'a> DesktopEntry<'a> {
 
     pub fn localized_entry_splitted<L: AsRef<str>>(
         &self,
-        group: Option<&'a KeyMap<'a>>,
+        group: Option<&'a Group<'a>>,
         key: &str,
         locales: &[L],
     ) -> Option<Vec<Cow<'a, str>>> {
-        let (default_value, locale_map) = group?.get(key)?;
+        let (default_value, locale_map) = group?.0.get(key)?;
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
@@ -346,10 +399,10 @@ use std::fmt::{self, Display, Formatter};
 
 impl<'a> Display for DesktopEntry<'a> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        for (group, keymap) in &self.groups {
-            let _ = writeln!(formatter, "[{}]", group);
+        for (group_name, group) in &self.groups.0 {
+            let _ = writeln!(formatter, "[{}]", group_name);
 
-            for (key, (value, localizations)) in keymap {
+            for (key, (value, localizations)) in &group.0 {
                 let _ = writeln!(formatter, "{}={}", key, value);
                 for (locale, localized) in localizations {
                     let _ = writeln!(formatter, "{}[{}]={}", key, locale, localized);
