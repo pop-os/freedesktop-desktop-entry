@@ -31,8 +31,5 @@ fn bench(it: u32) {
         total_time += now.elapsed();
     }
 
-    println!("bench_borrowed: {:.2?}", total_time / it);
+    println!("time to parse all .desktop files: {:.2?}", total_time / it);
 }
-
-
-
