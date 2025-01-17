@@ -5,6 +5,7 @@ mod decoder;
 mod iter;
 
 mod exec;
+use cached::proc_macro::cached;
 pub use exec::ExecError;
 
 pub mod matching;
@@ -18,106 +19,118 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use xdg::BaseDirectories;
 
-pub type Group<'a> = Cow<'a, str>;
-pub type Groups<'a> = BTreeMap<Group<'a>, KeyMap<'a>>;
-pub type Key<'a> = Cow<'a, str>;
-pub type KeyMap<'a> = BTreeMap<Key<'a>, (Value<'a>, LocaleMap<'a>)>;
-pub type Locale<'a> = Cow<'a, str>;
-pub type LocaleMap<'a> = BTreeMap<Locale<'a>, Value<'a>>;
-pub type Value<'a> = Cow<'a, str>;
+pub type GroupName = String;
+#[derive(Debug, Clone, Default)]
+pub struct Groups(pub BTreeMap<GroupName, Group>);
 
-#[derive(Debug, Clone, Eq)]
-pub struct DesktopEntry<'a> {
-    pub appid: Cow<'a, str>,
-    pub groups: Groups<'a>,
-    pub path: Cow<'a, Path>,
-    pub ubuntu_gettext_domain: Option<Cow<'a, str>>,
+impl Groups {
+    pub fn desktop_entry(&self) -> Option<&Group> {
+        self.0.get("Desktop Entry")
+    }
+
+    pub fn group(&self, key: &str) -> Option<&Group> {
+        self.0.get(key)
+    }
 }
 
-impl Hash for DesktopEntry<'_> {
+pub type Key = String;
+#[derive(Debug, Clone, Default)]
+pub struct Group(pub BTreeMap<Key, (Value, LocaleMap)>);
+
+impl Group {
+    pub fn localized_entry<L: AsRef<str>>(&self, key: &str, locales: &[L]) -> Option<&str> {
+        let (default_value, locale_map) = self.0.get(key)?;
+
+        for locale in locales {
+            match locale_map.get(locale.as_ref()) {
+                Some(value) => return Some(value),
+                None => {
+                    if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
+                        if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
+                            return Some(value);
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(default_value)
+    }
+
+    pub fn entry(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(|key| key.0.as_ref())
+    }
+
+    pub fn entry_bool(&self, key: &str) -> Option<bool> {
+        match self.entry(key)? {
+            "true" => Some(true),
+            "false" => Some(false),
+            _ => None,
+        }
+    }
+}
+
+pub type Locale = String;
+pub type LocaleMap = BTreeMap<Locale, Value>;
+pub type Value = String;
+
+#[derive(Debug, Clone)]
+pub struct DesktopEntry {
+    pub appid: String,
+    pub groups: Groups,
+    pub path: PathBuf,
+    pub ubuntu_gettext_domain: Option<String>,
+}
+
+impl Eq for DesktopEntry {}
+
+impl Hash for DesktopEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.appid.hash(state);
     }
 }
 
-impl PartialEq for DesktopEntry<'_> {
+impl PartialEq for DesktopEntry {
     fn eq(&self, other: &Self) -> bool {
         self.appid == other.appid
     }
 }
 
-impl DesktopEntry<'_> {
+impl DesktopEntry {
     /// Construct a new [`DesktopEntry`] from an appid. The name field will be
     /// set to that appid.
-    pub fn from_appid(appid: &str) -> DesktopEntry<'_> {
+    pub fn from_appid(appid: String) -> DesktopEntry {
+        let name = appid.split('.').next_back().unwrap_or(&appid).to_string();
+
         let mut de = DesktopEntry {
-            appid: Cow::Borrowed(appid),
+            appid,
             groups: Groups::default(),
-            path: Cow::Owned(PathBuf::from("")),
+            path: PathBuf::from(""),
             ubuntu_gettext_domain: None,
         };
-        de.add_desktop_entry("Name", appid);
+        de.add_desktop_entry("Name".to_string(), name);
         de
     }
 }
 
-impl<'a> DesktopEntry<'a> {
-    // note that we shoudn't implement ToOwned in this case: https://stackoverflow.com/questions/72105604/implement-toowned-for-user-defined-types
-    pub fn to_owned(&self) -> DesktopEntry<'static> {
-        let mut new_groups = Groups::new();
-
-        for (group, key_map) in &self.groups {
-            let mut new_key_map = KeyMap::new();
-
-            for (key, (value, locale_map)) in key_map {
-                let mut new_locale_map = LocaleMap::new();
-
-                for (locale, value) in locale_map {
-                    new_locale_map.insert(
-                        Cow::Owned(locale.to_string()),
-                        Cow::Owned(value.to_string()),
-                    );
-                }
-
-                new_key_map.insert(
-                    Cow::Owned(key.to_string()),
-                    (Cow::Owned(value.to_string()), new_locale_map),
-                );
-            }
-
-            new_groups.insert(Cow::Owned(group.to_string()), new_key_map);
-        }
-
-        DesktopEntry {
-            appid: Cow::Owned(self.appid.to_string()),
-            groups: new_groups,
-            ubuntu_gettext_domain: self
-                .ubuntu_gettext_domain
-                .as_ref()
-                .map(|ubuntu_gettext_domain| Cow::Owned(ubuntu_gettext_domain.to_string())),
-            path: Cow::Owned(self.path.to_path_buf()),
-        }
-    }
-}
-
-impl<'a> DesktopEntry<'a> {
-    pub fn id(&'a self) -> &'a str {
+impl DesktopEntry {
+    pub fn id(&self) -> &str {
         self.appid.as_ref()
     }
 
     /// A desktop entry field if any field under the `[Desktop Entry]` section.
-    pub fn desktop_entry(&'a self, key: &str) -> Option<&'a str> {
-        Self::entry(self.groups.get("Desktop Entry"), key)
+    pub fn desktop_entry(&self, key: &str) -> Option<&str> {
+        self.groups.desktop_entry()?.entry(key)
     }
 
-    pub fn desktop_entry_localized<L: AsRef<str>>(
+    pub fn desktop_entry_localized<'a, L: AsRef<str>>(
         &'a self,
         key: &str,
         locales: &[L],
     ) -> Option<Cow<'a, str>> {
         Self::localized_entry(
             self.ubuntu_gettext_domain.as_deref(),
-            self.groups.get("Desktop Entry"),
+            self.groups.desktop_entry(),
             key,
             locales,
         )
@@ -125,103 +138,99 @@ impl<'a> DesktopEntry<'a> {
 
     /// Insert a new field to this [`DesktopEntry`], in the `[Desktop Entry]` section, removing
     /// the previous value and locales in any.
-    pub fn add_desktop_entry<'b>(&'b mut self, key: &'a str, value: &'a str)
-    where
-        'a: 'b,
-    {
+    pub fn add_desktop_entry(&mut self, key: String, value: String) {
         let action_key = "Desktop Entry";
-        let key = Cow::Borrowed(key);
-        let value = (Cow::Borrowed(value), LocaleMap::default());
+        let value = (value, LocaleMap::default());
 
-        match self.groups.get_mut(action_key) {
+        match self.groups.0.get_mut(action_key) {
             Some(keymap) => {
-                keymap.insert(key, value);
+                keymap.0.insert(key, value);
             }
             None => {
-                let mut keymap = KeyMap::default();
-                keymap.insert(key, value);
-                self.groups.insert(Cow::Borrowed(action_key), keymap);
+                let mut keymap = Group::default();
+                keymap.0.insert(key, value);
+                self.groups.0.insert(action_key.to_string(), keymap);
             }
         }
     }
 
-    pub fn name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+    pub fn name<L: AsRef<str>>(&self, locales: &[L]) -> Option<Cow<'_, str>> {
         self.desktop_entry_localized("Name", locales)
     }
 
-    pub fn generic_name<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+    pub fn generic_name<L: AsRef<str>>(&self, locales: &[L]) -> Option<Cow<'_, str>> {
         self.desktop_entry_localized("GenericName", locales)
     }
 
-    pub fn icon(&'a self) -> Option<&'a str> {
+    pub fn icon(&self) -> Option<&str> {
         self.desktop_entry("Icon")
     }
 
     /// This is an human readable description of the desktop file.
-    pub fn comment<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
+    pub fn comment<L: AsRef<str>>(&self, locales: &[L]) -> Option<Cow<str>> {
         self.desktop_entry_localized("Comment", locales)
     }
 
-    pub fn exec(&'a self) -> Option<&'a str> {
+    pub fn exec(&self) -> Option<&str> {
         self.desktop_entry("Exec")
     }
 
     /// Return categories
-    pub fn categories(&'a self) -> Option<Vec<&'a str>> {
+    pub fn categories(&self) -> Option<Vec<&str>> {
         self.desktop_entry("Categories")
             .map(|e| e.split(';').collect())
     }
 
     /// Return keywords
-    pub fn keywords<L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Vec<Cow<'a, str>>> {
-        self.localized_entry_splitted(self.groups.get("Desktop Entry"), "Keywords", locales)
+    pub fn keywords<L: AsRef<str>>(&self, locales: &[L]) -> Option<Vec<Cow<str>>> {
+        self.localized_entry_splitted(self.groups.desktop_entry(), "Keywords", locales)
     }
 
     /// Return mime types
-    pub fn mime_type(&'a self) -> Option<Vec<&'a str>> {
+    pub fn mime_type(&self) -> Option<Vec<&str>> {
         self.desktop_entry("MimeType")
             .map(|e| e.split(';').collect())
     }
 
-    pub fn no_display(&'a self) -> bool {
+    pub fn no_display(&self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
-    pub fn only_show_in(&'a self) -> Option<Vec<&'a str>> {
+    pub fn only_show_in(&self) -> Option<Vec<&str>> {
         self.desktop_entry("OnlyShowIn")
             .map(|e| e.split(';').collect())
     }
 
-    pub fn not_show_in(&'a self) -> Option<Vec<&'a str>> {
+    pub fn not_show_in(&self) -> Option<Vec<&str>> {
         self.desktop_entry("NotShowIn")
             .map(|e| e.split(';').collect())
     }
 
-    pub fn flatpak(&'a self) -> Option<&'a str> {
+    pub fn flatpak(&self) -> Option<&str> {
         self.desktop_entry("X-Flatpak")
     }
 
-    pub fn prefers_non_default_gpu(&'a self) -> bool {
+    pub fn prefers_non_default_gpu(&self) -> bool {
         self.desktop_entry_bool("PrefersNonDefaultGPU")
     }
 
-    pub fn startup_notify(&'a self) -> bool {
+    pub fn startup_notify(&self) -> bool {
         self.desktop_entry_bool("StartupNotify")
     }
 
-    pub fn startup_wm_class(&'a self) -> Option<&'a str> {
+    pub fn startup_wm_class(&self) -> Option<&str> {
         self.desktop_entry("StartupWMClass")
     }
 
-    pub fn terminal(&'a self) -> bool {
+    pub fn terminal(&self) -> bool {
         self.desktop_entry_bool("Terminal")
     }
 
-    pub fn type_(&'a self) -> Option<&'a str> {
+    pub fn type_(&self) -> Option<&str> {
         self.desktop_entry("Type")
     }
 
-    pub fn actions(&'a self) -> Option<Vec<&'a str>> {
+    pub fn actions(&self) -> Option<Vec<&str>> {
         self.desktop_entry("Actions")
             .map(|e| e.split(';').collect())
     }
@@ -237,64 +246,52 @@ impl<'a> DesktopEntry<'a> {
     /// ```ignore
     /// entry.action_entry("new-window", "Name")
     /// ```
-    pub fn action_entry(&'a self, action: &str, key: &str) -> Option<&'a str> {
-        let group = self
-            .groups
-            .get(["Desktop Action ", action].concat().as_str());
-
-        Self::entry(group, key)
+    pub fn action_entry(&self, action: &str, key: &str) -> Option<&str> {
+        self.groups
+            .group(["Desktop Action ", action].concat().as_str())?
+            .entry(key)
     }
 
     pub fn action_entry_localized<L: AsRef<str>>(
-        &'a self,
+        &self,
         action: &str,
         key: &str,
         locales: &[L],
-    ) -> Option<Cow<'a, str>> {
+    ) -> Option<Cow<'_, str>> {
         let group = self
             .groups
-            .get(["Desktop Action ", action].concat().as_str());
+            .group(["Desktop Action ", action].concat().as_str());
 
         Self::localized_entry(self.ubuntu_gettext_domain.as_deref(), group, key, locales)
     }
 
-    pub fn action_name<L: AsRef<str>>(
-        &'a self,
-        action: &str,
-        locales: &[L],
-    ) -> Option<Cow<'a, str>> {
+    pub fn action_name<L: AsRef<str>>(&self, action: &str, locales: &[L]) -> Option<Cow<str>> {
         self.action_entry_localized(action, "Name", locales)
     }
 
-    pub fn action_exec(&'a self, action: &str) -> Option<&'a str> {
+    pub fn action_exec(&self, action: &str) -> Option<&str> {
         self.action_entry(action, "Exec")
     }
 
-    fn desktop_entry_bool(&'a self, key: &str) -> bool {
+    fn desktop_entry_bool(&self, key: &str) -> bool {
         self.desktop_entry(key).map_or(false, |v| v == "true")
     }
 
-    fn entry(group: Option<&'a KeyMap<'a>>, key: &str) -> Option<&'a str> {
-        group
-            .and_then(|group| group.get(key))
-            .map(|key| key.0.as_ref())
-    }
-
-    pub(crate) fn localized_entry<L: AsRef<str>>(
-        ubuntu_gettext_domain: Option<&'a str>,
-        group: Option<&'a KeyMap<'a>>,
+    pub(crate) fn localized_entry<'a, L: AsRef<str>>(
+        ubuntu_gettext_domain: Option<&str>,
+        group: Option<&'a Group>,
         key: &str,
         locales: &[L],
     ) -> Option<Cow<'a, str>> {
-        let (default_value, locale_map) = group?.get(key)?;
+        let (default_value, locale_map) = group?.0.get(key)?;
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
-                Some(value) => return Some(value.clone()),
+                Some(value) => return Some(Cow::Borrowed(value)),
                 None => {
                     if let Some(pos) = memchr::memchr(b'_', locale.as_ref().as_bytes()) {
                         if let Some(value) = locale_map.get(&locale.as_ref()[..pos]) {
-                            return Some(value.clone());
+                            return Some(Cow::Borrowed(value));
                         }
                     }
                 }
@@ -303,16 +300,16 @@ impl<'a> DesktopEntry<'a> {
         if let Some(domain) = ubuntu_gettext_domain {
             return Some(Cow::Owned(dgettext(domain, default_value)));
         }
-        Some(default_value.clone())
+        Some(Cow::Borrowed(default_value))
     }
 
-    pub fn localized_entry_splitted<L: AsRef<str>>(
+    pub fn localized_entry_splitted<'a, L: AsRef<str>>(
         &self,
-        group: Option<&'a KeyMap<'a>>,
+        group: Option<&'a Group>,
         key: &str,
         locales: &[L],
     ) -> Option<Vec<Cow<'a, str>>> {
-        let (default_value, locale_map) = group?.get(key)?;
+        let (default_value, locale_map) = group?.0.get(key)?;
 
         for locale in locales {
             match locale_map.get(locale.as_ref()) {
@@ -343,12 +340,12 @@ impl<'a> DesktopEntry<'a> {
 
 use std::fmt::{self, Display, Formatter};
 
-impl<'a> Display for DesktopEntry<'a> {
+impl Display for DesktopEntry {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        for (group, keymap) in &self.groups {
-            let _ = writeln!(formatter, "[{}]", group);
+        for (group_name, group) in &self.groups.0 {
+            let _ = writeln!(formatter, "[{}]", group_name);
 
-            for (key, (value, localizations)) in keymap {
+            for (key, (value, localizations)) in &group.0 {
                 let _ = writeln!(formatter, "{}={}", key, value);
                 for (locale, localized) in localizations {
                     let _ = writeln!(formatter, "{}[{}]={}", key, locale, localized);
@@ -431,6 +428,7 @@ pub(crate) fn dgettext(domain: &str, message: &str) -> String {
 
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
+#[cached]
 pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
@@ -461,7 +459,7 @@ pub fn current_desktop() -> Option<Vec<String>> {
 #[test]
 fn add_field() {
     let appid = "appid";
-    let de = DesktopEntry::from_appid(appid);
+    let de = DesktopEntry::from_appid(appid.to_string());
 
     assert_eq!(de.appid, appid);
     assert_eq!(de.name(&[] as &[&str]).unwrap(), appid);

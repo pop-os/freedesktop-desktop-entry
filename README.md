@@ -10,12 +10,18 @@ use freedesktop_desktop_entry::{default_paths, get_languages_from_env, Iter, Pat
 
 fn main() {
     let locales = get_languages_from_env();
-    for entry in Iter::new(default_paths()).entries(Some(&locales)) {
+
+    let entries = Iter::new(default_paths())
+        .entries(Some(&locales))
+        .collect::<Vec<_>>();
+    
+    for entry in entries {
         let path_src = PathSource::guess_from(&entry.path);
-        
+
         println!("{:?}: {}\n---\n{}", path_src, entry.path.display(), entry);
     }
 }
+
 ```
 
 ## License

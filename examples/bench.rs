@@ -10,12 +10,10 @@ use std::time::Instant;
 fn main() {
     let it = 500;
 
-    bench_borrowed(it);
-    bench_owned(it);
-    bench_owned_optimized(it);
+    bench(it);
 }
 
-fn bench_borrowed(it: u32) {
+fn bench(it: u32) {
     let mut total_time = Duration::ZERO;
 
     for _ in 0..it {
@@ -33,41 +31,5 @@ fn bench_borrowed(it: u32) {
         total_time += now.elapsed();
     }
 
-    println!("bench_borrowed: {:.2?}", total_time / it);
-}
-
-fn bench_owned(it: u32) {
-    let mut total_time = Duration::ZERO;
-
-    for _ in 0..it {
-        let locale = get_languages_from_env();
-        let paths = Iter::new(default_paths());
-
-        let now = Instant::now();
-
-        for path in paths {
-            if let Ok(_entry) = DesktopEntry::from_path(path, Some(&locale)) {}
-        }
-
-        total_time += now.elapsed();
-    }
-
-    println!("bench_owned: {:.2?}", total_time / it);
-}
-
-fn bench_owned_optimized(it: u32) {
-    let mut total_time = Duration::ZERO;
-
-    for _ in 0..it {
-        let locale = get_languages_from_env();
-        let paths = Iter::new(default_paths());
-
-        let now = Instant::now();
-
-        let _ = paths.entries(Some(&locale)).collect::<Vec<_>>();
-
-        total_time += now.elapsed();
-    }
-
-    println!("bench_owned_optimized: {:.2?}", total_time / it);
+    println!("time to parse all .desktop files: {:.2?}", total_time / it);
 }

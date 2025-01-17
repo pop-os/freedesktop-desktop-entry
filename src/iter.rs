@@ -3,10 +3,7 @@
 
 use std::{collections::VecDeque, fs, path::PathBuf};
 
-use crate::{
-    decoder::{add_generic_locales, decode_from_path_with_buf},
-    DesktopEntry,
-};
+use crate::DesktopEntry;
 
 pub struct Iter {
     directories_to_walk: VecDeque<PathBuf>,
@@ -76,14 +73,11 @@ impl Iter {
     pub fn entries<'i, 'l: 'i, L>(
         self,
         locales_filter: Option<&'l [L]>,
-    ) -> impl Iterator<Item = DesktopEntry<'static>> + 'i
+    ) -> impl Iterator<Item = DesktopEntry> + 'i
     where
         L: AsRef<str>,
     {
-        let mut buf = String::new();
-        let locales_filter = locales_filter.map(add_generic_locales);
-
-        self.map(move |path| decode_from_path_with_buf(path, locales_filter.as_deref(), &mut buf))
+        self.map(move |path| DesktopEntry::from_path(path, locales_filter))
             .filter_map(|e| e.ok())
     }
 }
