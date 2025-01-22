@@ -272,7 +272,7 @@ fn format_value(input: &str) -> Result<String, DecodeError> {
         }
 
         // when there is an \ at the end
-        if input.len() < i + 1 {
+        if input.len() <= i + 1 {
             return Err(DecodeError::InvalidValue);
         }
 
