@@ -11,10 +11,8 @@ categories = [ "os::unix-apis" ]
 keywords = [ "freedesktop", "desktop", "entry" ]
 
 [dependencies]
-dirs = "5"
 gettext-rs = { version = "0.7", features = ["gettext-system"]}
 memchr = "2"
-textdistance = "1"
 strsim = "0.11"
 thiserror = "2"
 xdg = "2"
