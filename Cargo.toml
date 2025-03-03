@@ -1,6 +1,6 @@
 [package]
 name = "freedesktop-desktop-entry"
-version = "0.7.7"
+version = "0.7.8"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition = "2021"
 repository = "https://github.com/pop-os/freedesktop-desktop-entry"
@@ -17,5 +17,5 @@ strsim = "0.11"
 thiserror = "2"
 xdg = "2"
 log = "0.4"
-cached = "0.54"
+cached = "0.55"
 
