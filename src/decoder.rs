@@ -18,8 +18,6 @@ pub enum DecodeError {
     Io(#[from] std::io::Error),
     #[error("MultipleGroupWithSameName")]
     MultipleGroupWithSameName,
-    #[error("MultipleKeysWithSameName")]
-    MultipleKeysWithSameName,
     #[error("KeyValueWithoutAGroup")]
     KeyValueWithoutAGroup,
     #[error("InvalidKey. Accepted: A-Za-z0-9")]
@@ -64,17 +62,13 @@ impl DesktopEntry {
         if let Some(active_keys) = active_keys.take() {
             match &mut active_group {
                 Some(active_group) => {
-                    if active_group
+                    active_group
                         .group
                         .0
                         .insert(
                             active_keys.key_name,
                             (active_keys.default_value, active_keys.locales),
-                        )
-                        .is_some()
-                    {
-                        return Err(DecodeError::MultipleKeysWithSameName);
-                    }
+                        );
                 }
                 None => return Err(DecodeError::KeyValueWithoutAGroup),
             }
@@ -153,18 +147,13 @@ fn process_line<L: AsRef<str>>(
             if let Some(active_keys) = active_keys.take() {
                 match active_group {
                     Some(active_group) => {
-                        if active_group
+                        active_group
                             .group
                             .0
                             .insert(
                                 active_keys.key_name,
                                 (active_keys.default_value, active_keys.locales),
-                            )
-                            .is_some()
-                        {
-                            dbg!(&active_group.group);
-                            return Err(DecodeError::MultipleKeysWithSameName);
-                        }
+                            );
                     }
                     None => return Err(DecodeError::KeyValueWithoutAGroup),
                 }
@@ -226,18 +215,13 @@ fn process_line<L: AsRef<str>>(
         if let Some(active_keys) = active_keys.take() {
             match active_group {
                 Some(active_group) => {
-                    if active_group
+                    active_group
                         .group
                         .0
                         .insert(
                             active_keys.key_name,
                             (active_keys.default_value, active_keys.locales),
-                        )
-                        .is_some()
-                    {
-                        dbg!(&active_group.group);
-                        return Err(DecodeError::MultipleKeysWithSameName);
-                    }
+                        );
                 }
                 None => return Err(DecodeError::KeyValueWithoutAGroup),
             }
