@@ -9,7 +9,7 @@ fn main() {
     let entries = Iter::new(default_paths())
         .entries(Some(&locales))
         .collect::<Vec<_>>();
-    
+
     for entry in entries {
         let path_src = PathSource::guess_from(&entry.path);
 

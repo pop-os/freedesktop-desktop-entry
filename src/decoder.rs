@@ -62,13 +62,10 @@ impl DesktopEntry {
         if let Some(active_keys) = active_keys.take() {
             match &mut active_group {
                 Some(active_group) => {
-                    active_group
-                        .group
-                        .0
-                        .insert(
-                            active_keys.key_name,
-                            (active_keys.default_value, active_keys.locales),
-                        );
+                    active_group.group.0.insert(
+                        active_keys.key_name,
+                        (active_keys.default_value, active_keys.locales),
+                    );
                 }
                 None => return Err(DecodeError::KeyValueWithoutAGroup),
             }
@@ -147,13 +144,10 @@ fn process_line<L: AsRef<str>>(
             if let Some(active_keys) = active_keys.take() {
                 match active_group {
                     Some(active_group) => {
-                        active_group
-                            .group
-                            .0
-                            .insert(
-                                active_keys.key_name,
-                                (active_keys.default_value, active_keys.locales),
-                            );
+                        active_group.group.0.insert(
+                            active_keys.key_name,
+                            (active_keys.default_value, active_keys.locales),
+                        );
                     }
                     None => return Err(DecodeError::KeyValueWithoutAGroup),
                 }
@@ -215,13 +209,10 @@ fn process_line<L: AsRef<str>>(
         if let Some(active_keys) = active_keys.take() {
             match active_group {
                 Some(active_group) => {
-                    active_group
-                        .group
-                        .0
-                        .insert(
-                            active_keys.key_name,
-                            (active_keys.default_value, active_keys.locales),
-                        );
+                    active_group.group.0.insert(
+                        active_keys.key_name,
+                        (active_keys.default_value, active_keys.locales),
+                    );
                 }
                 None => return Err(DecodeError::KeyValueWithoutAGroup),
             }
