@@ -3,6 +3,7 @@
 
 use std::{
     fs::{self},
+    mem,
     path::{Path, PathBuf},
 };
 
@@ -48,6 +49,7 @@ impl DesktopEntry {
 
         let locales_filter = locales_filter.map(add_generic_locales);
 
+        let mut missing_keys = Vec::new();
         for line in input.lines() {
             process_line(
                 line,
@@ -56,7 +58,25 @@ impl DesktopEntry {
                 &mut active_keys,
                 &mut ubuntu_gettext_domain,
                 locales_filter.as_deref(),
-            )?
+                &mut missing_keys,
+            )?;
+        }
+        if missing_keys.len() > 0 {
+            let mut check_again = mem::take(&mut missing_keys);
+            for missing in check_again.drain(..) {
+                process_line(
+                    missing,
+                    &mut groups,
+                    &mut active_group,
+                    &mut active_keys,
+                    &mut ubuntu_gettext_domain,
+                    locales_filter.as_deref(),
+                    &mut missing_keys,
+                )?;
+            }
+            if missing_keys.len() > 0 {
+                return Err(DecodeError::KeyDoesNotExist);
+            }
         }
 
         if let Some(active_keys) = active_keys.take() {
@@ -123,13 +143,14 @@ struct ActiveKeys {
 }
 
 #[inline]
-fn process_line<L: AsRef<str>>(
-    line: &str,
+fn process_line<'a, L: AsRef<str>>(
+    line: &'a str,
     groups: &mut Groups,
     active_group: &mut Option<ActiveGroup>,
     active_keys: &mut Option<ActiveKeys>,
     ubuntu_gettext_domain: &mut Option<String>,
     locales_filter: Option<&[L]>,
+    missing_keys: &mut Vec<&'a str>,
 ) -> Result<(), DecodeError> {
     if line.trim().is_empty() || line.starts_with('#') {
         return Ok(());
@@ -138,6 +159,23 @@ fn process_line<L: AsRef<str>>(
     let line_bytes = line.as_bytes();
 
     if line_bytes[0] == b'[' {
+        if missing_keys.len() > 0 {
+            let mut check_again = mem::take(missing_keys);
+            for missing in check_again.drain(..) {
+                process_line(
+                    missing,
+                    groups,
+                    active_group,
+                    active_keys,
+                    ubuntu_gettext_domain,
+                    locales_filter,
+                    missing_keys,
+                )?;
+            }
+            if missing_keys.len() > 0 {
+                return Err(DecodeError::KeyDoesNotExist);
+            }
+        }
         if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
             let group_name = &line[1..end + 1];
 
@@ -194,7 +232,9 @@ fn process_line<L: AsRef<str>>(
                     Some(active_keys) => {
                         active_keys.locales.insert(locale.to_string(), value);
                     }
-                    None => return Err(DecodeError::KeyDoesNotExist),
+                    None => {
+                        missing_keys.push(line);
+                    }
                 }
 
                 return Ok(());
