@@ -1,21 +1,19 @@
 [package]
 name = "freedesktop-desktop-entry"
-version = "0.7.9"
+version = "0.7.10"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition = "2021"
 repository = "https://github.com/pop-os/freedesktop-desktop-entry"
 description = "Freedesktop Desktop Entry Specification"
 license = "MPL-2.0"
 readme = "README.md"
-categories = [ "os::unix-apis" ]
-keywords = [ "freedesktop", "desktop", "entry" ]
+categories = ["os::unix-apis"]
+keywords = ["freedesktop", "desktop", "entry"]
 
 [dependencies]
-gettext-rs = { version = "0.7", features = ["gettext-system"]}
+gettext-rs = { version = "0.7", features = ["gettext-system"] }
 memchr = "2"
-strsim = "0.11"
 thiserror = "2"
 xdg = "2"
 log = "0.4"
-cached = "0.55"
-
+unicase = "2.8.1"

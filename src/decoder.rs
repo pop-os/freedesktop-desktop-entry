@@ -38,34 +38,25 @@ impl DesktopEntry {
     where
         L: AsRef<str>,
     {
-        let path: PathBuf = path.into();
+        #[inline(never)]
+        fn inner<'a>(
+            path: PathBuf,
+            input: &'a str,
+            locales_filter: Option<Vec<&str>>,
+        ) -> Result<DesktopEntry, DecodeError> {
+            let path: PathBuf = path.into();
 
-        let appid = get_app_id(&path)?;
+            let appid = get_app_id(&path)?;
 
-        let mut groups = Groups::default();
-        let mut active_group: Option<ActiveGroup> = None;
-        let mut active_keys: Option<ActiveKeys> = None;
-        let mut ubuntu_gettext_domain = None;
+            let mut groups = Groups::default();
+            let mut active_group: Option<ActiveGroup> = None;
+            let mut active_keys: Option<ActiveKeys> = None;
+            let mut ubuntu_gettext_domain = None;
 
-        let locales_filter = locales_filter.map(add_generic_locales);
-
-        let mut missing_keys = Vec::new();
-        for line in input.lines() {
-            process_line(
-                line,
-                &mut groups,
-                &mut active_group,
-                &mut active_keys,
-                &mut ubuntu_gettext_domain,
-                locales_filter.as_deref(),
-                &mut missing_keys,
-            )?;
-        }
-        if missing_keys.len() > 0 {
-            let mut check_again = mem::take(&mut missing_keys);
-            for missing in check_again.drain(..) {
+            let mut missing_keys = Vec::new();
+            for line in input.lines() {
                 process_line(
-                    missing,
+                    line,
                     &mut groups,
                     &mut active_group,
                     &mut active_keys,
@@ -75,37 +66,57 @@ impl DesktopEntry {
                 )?;
             }
             if missing_keys.len() > 0 {
-                return Err(DecodeError::KeyDoesNotExist);
-            }
-        }
-
-        if let Some(active_keys) = active_keys.take() {
-            match &mut active_group {
-                Some(active_group) => {
-                    active_group.group.0.insert(
-                        active_keys.key_name,
-                        (active_keys.default_value, active_keys.locales),
-                    );
+                let mut check_again = mem::take(&mut missing_keys);
+                for missing in check_again.drain(..) {
+                    process_line(
+                        missing,
+                        &mut groups,
+                        &mut active_group,
+                        &mut active_keys,
+                        &mut ubuntu_gettext_domain,
+                        locales_filter.as_deref(),
+                        &mut missing_keys,
+                    )?;
                 }
-                None => return Err(DecodeError::KeyValueWithoutAGroup),
+                if missing_keys.len() > 0 {
+                    return Err(DecodeError::KeyDoesNotExist);
+                }
             }
+
+            if let Some(active_keys) = active_keys.take() {
+                match &mut active_group {
+                    Some(active_group) => {
+                        active_group.group.0.insert(
+                            active_keys.key_name,
+                            (active_keys.default_value, active_keys.locales),
+                        );
+                    }
+                    None => return Err(DecodeError::KeyValueWithoutAGroup),
+                }
+            }
+
+            if let Some(mut group) = active_group.take() {
+                groups
+                    .0
+                    .entry(group.group_name)
+                    .or_insert_with(|| Group::default())
+                    .0
+                    .append(&mut group.group.0);
+            }
+
+            Ok(DesktopEntry {
+                appid: appid.to_string(),
+                groups,
+                path,
+                ubuntu_gettext_domain,
+            })
         }
 
-        if let Some(group) = active_group.take() {
-            if groups.0.insert(group.group_name, group.group).is_some() {
-                return Err(DecodeError::MultipleGroupWithSameName);
-            }
-        }
-
-        Ok(DesktopEntry {
-            appid: appid.to_string(),
-            groups,
-            path,
-            ubuntu_gettext_domain,
-        })
+        inner(path.into(), input, locales_filter.map(add_generic_locales))
     }
 
     /// Return an owned [`DesktopEntry`]
+    #[inline]
     pub fn from_path<L>(
         path: impl Into<PathBuf>,
         locales_filter: Option<&[L]>,
@@ -119,6 +130,7 @@ impl DesktopEntry {
     }
 }
 
+#[inline]
 fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<&str, DecodeError> {
     let appid = path
         .as_ref()
@@ -142,14 +154,14 @@ struct ActiveKeys {
     locales: LocaleMap,
 }
 
-#[inline]
-fn process_line<'a, L: AsRef<str>>(
+#[inline(never)]
+fn process_line<'a>(
     line: &'a str,
     groups: &mut Groups,
     active_group: &mut Option<ActiveGroup>,
     active_keys: &mut Option<ActiveKeys>,
     ubuntu_gettext_domain: &mut Option<String>,
-    locales_filter: Option<&[L]>,
+    locales_filter: Option<&[&str]>,
     missing_keys: &mut Vec<&'a str>,
 ) -> Result<(), DecodeError> {
     if line.trim().is_empty() || line.starts_with('#') {
@@ -191,10 +203,13 @@ fn process_line<'a, L: AsRef<str>>(
                 }
             }
 
-            if let Some(group) = active_group.take() {
-                if groups.0.insert(group.group_name, group.group).is_some() {
-                    return Err(DecodeError::MultipleGroupWithSameName);
-                }
+            if let Some(mut group) = active_group.take() {
+                groups
+                    .0
+                    .entry(group.group_name)
+                    .or_insert_with(|| Group::default())
+                    .0
+                    .append(&mut group.group.0);
             }
 
             active_group.replace(ActiveGroup {
@@ -220,9 +235,7 @@ fn process_line<'a, L: AsRef<str>>(
                 let locale = &key[start + 1..key.len() - 1];
 
                 match locales_filter {
-                    Some(locales_filter)
-                        if !locales_filter.iter().any(|l| l.as_ref() == locale) =>
-                    {
+                    Some(locales_filter) if !locales_filter.iter().any(|l| *l == locale) => {
                         return Ok(())
                     }
                     _ => (),
@@ -317,7 +330,8 @@ fn format_value(input: &str) -> Result<String, DecodeError> {
 }
 
 /// Ex: if a locale equal fr_FR, add fr
-pub(crate) fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
+#[inline]
+fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
     let mut v = Vec::with_capacity(locales.len() + 1);
 
     for l in locales {

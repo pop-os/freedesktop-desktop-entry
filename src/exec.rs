@@ -17,11 +17,13 @@ pub enum ExecError {
 }
 
 impl DesktopEntry {
+    #[inline]
     pub fn parse_exec(&self) -> Result<Vec<String>, ExecError> {
         self.get_args(self.exec(), &[], &[] as &[&str])
     }
 
     /// Macros like `%f` (cf [.desktop spec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#exec-variables)) will be subtitued using the `uris` parameter.
+    #[inline]
     pub fn parse_exec_with_uris<L>(
         &self,
         uris: &[&str],
@@ -33,10 +35,12 @@ impl DesktopEntry {
         self.get_args(self.exec(), uris, locales)
     }
 
+    #[inline]
     pub fn parse_exec_action(&self, action_name: &str) -> Result<Vec<String>, ExecError> {
         self.get_args(self.action_exec(action_name), &[], &[] as &[&str])
     }
 
+    #[inline]
     pub fn parse_exec_action_with_uris<L>(
         &self,
         action_name: &str,
@@ -58,63 +62,78 @@ impl DesktopEntry {
     where
         L: AsRef<str>,
     {
-        let Some(exec) = exec else {
-            return Err(ExecError::ExecFieldNotFound);
-        };
+        #[inline(never)]
+        fn inner<'a>(
+            this: &'a DesktopEntry,
+            exec: Option<&str>,
+            uris: &[&str],
+            locales: &mut dyn Iterator<Item = &str>,
+        ) -> Result<Vec<String>, ExecError> {
+            let Some(exec) = exec else {
+                return Err(ExecError::ExecFieldNotFound);
+            };
 
-        let exec = if let Some(without_prefix) = exec.strip_prefix('\"') {
-            without_prefix
-                .strip_suffix('\"')
-                .ok_or(ExecError::WrongFormat("unmatched quote".into()))?
-        } else {
-            exec
-        };
+            let exec = if let Some(without_prefix) = exec.strip_prefix('\"') {
+                without_prefix
+                    .strip_suffix('\"')
+                    .ok_or(ExecError::WrongFormat("unmatched quote".into()))?
+            } else {
+                exec
+            };
 
-        let mut args: Vec<String> = Vec::new();
+            let mut args: Vec<String> = Vec::new();
 
-        for arg in exec.split_ascii_whitespace() {
-            match ArgOrFieldCode::try_from(arg) {
-                Ok(arg) => match arg {
-                    ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
-                        if let Some(arg) = uris.first() {
+            for arg in exec.split_ascii_whitespace() {
+                match ArgOrFieldCode::try_from(arg) {
+                    Ok(arg) => match arg {
+                        ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
+                            if let Some(arg) = uris.first() {
+                                args.push(arg.to_string());
+                            }
+                        }
+                        ArgOrFieldCode::FileList | ArgOrFieldCode::UrlList => {
+                            uris.iter().for_each(|uri| args.push(uri.to_string()));
+                        }
+                        ArgOrFieldCode::IconKey => {
+                            if let Some(icon) = this.icon() {
+                                args.push(icon.to_string());
+                            }
+                        }
+                        ArgOrFieldCode::TranslatedName => {
+                            if let Some(name) = DesktopEntry::localized_entry(
+                                this.ubuntu_gettext_domain.as_deref(),
+                                this.groups.desktop_entry(),
+                                "Name",
+                                locales,
+                            ) {
+                                args.push(name.to_string());
+                            }
+                        }
+                        ArgOrFieldCode::DesktopFileLocation => {
+                            args.push(this.path.to_string_lossy().to_string());
+                        }
+                        ArgOrFieldCode::Arg(arg) => {
                             args.push(arg.to_string());
                         }
+                    },
+                    Err(e) => {
+                        log::error!("{}", e);
                     }
-                    ArgOrFieldCode::FileList | ArgOrFieldCode::UrlList => {
-                        uris.iter().for_each(|uri| args.push(uri.to_string()));
-                    }
-                    ArgOrFieldCode::IconKey => {
-                        if let Some(icon) = self.icon() {
-                            args.push(icon.to_string());
-                        }
-                    }
-                    ArgOrFieldCode::TranslatedName => {
-                        if let Some(name) = self.name(locales) {
-                            args.push(name.to_string());
-                        }
-                    }
-                    ArgOrFieldCode::DesktopFileLocation => {
-                        args.push(self.path.to_string_lossy().to_string());
-                    }
-                    ArgOrFieldCode::Arg(arg) => {
-                        args.push(arg.to_string());
-                    }
-                },
-                Err(e) => {
-                    log::error!("{}", e);
                 }
             }
+
+            if args.is_empty() {
+                return Err(ExecError::ExecFieldIsEmpty);
+            }
+
+            if args.first().unwrap().contains('=') {
+                return Err(ExecError::WrongFormat("equal sign detected".into()));
+            }
+
+            Ok(args)
         }
 
-        if args.is_empty() {
-            return Err(ExecError::ExecFieldIsEmpty);
-        }
-
-        if args.first().unwrap().contains('=') {
-            return Err(ExecError::WrongFormat("equal sign detected".into()));
-        }
-
-        Ok(args)
+        inner(self, exec, uris, &mut locales.iter().map(AsRef::as_ref))
     }
 }
 

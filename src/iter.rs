@@ -12,6 +12,7 @@ pub struct Iter {
 
 impl Iter {
     /// Directories will be processed in order.
+    #[inline]
     pub fn new<I: Iterator<Item = PathBuf>>(directories_to_walk: I) -> Self {
         Self {
             directories_to_walk: directories_to_walk.collect(),
@@ -70,6 +71,7 @@ impl Iterator for Iter {
 }
 
 impl Iter {
+    #[inline]
     pub fn entries<'i, 'l: 'i, L>(
         self,
         locales_filter: Option<&'l [L]>,
