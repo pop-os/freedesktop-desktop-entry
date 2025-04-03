@@ -17,6 +17,13 @@ pub use unicase;
 use unicase::Ascii;
 use xdg::BaseDirectories;
 
+/// Read all desktop entries on disk into a Vec, with only the given locales retained.
+pub fn desktop_entries(locales: &[String]) -> Vec<DesktopEntry> {
+    Iter::new(default_paths())
+        .filter_map(|p| DesktopEntry::from_path(p, Some(&locales)).ok())
+        .collect::<Vec<_>>()
+}
+
 /// Case-insensitive search of desktop entries for the given app ID.
 ///
 /// Requires using the `unicase` crate for its `Ascii` case support.
@@ -110,18 +117,29 @@ pub struct DesktopEntry {
     pub ubuntu_gettext_domain: Option<String>,
 }
 
+impl Ord for DesktopEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (&self.path, &self.appid).cmp(&(&other.path, &other.appid))
+    }
+}
+
+impl PartialOrd for DesktopEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.path.cmp(&other.path))
+    }
+}
+
+impl PartialEq for DesktopEntry {
+    fn eq(&self, other: &Self) -> bool {
+        (&self.path, &self.appid) == (&other.path, &other.appid)
+    }
+}
+
 impl Eq for DesktopEntry {}
 
 impl Hash for DesktopEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.appid.hash(state);
-    }
-}
-
-impl PartialEq for DesktopEntry {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.appid == other.appid
     }
 }
 
@@ -149,6 +167,10 @@ impl DesktopEntry {
         id == self.id()
             // or startup_wm_class matches
             || self.startup_wm_class().map_or(false, |wm_class| wm_class == id)
+            // or the path itself matches
+            || self.path.file_stem()
+                .and_then(|os_str| os_str.to_str())
+                .map_or(false, |name| name == id)
     }
 
     // Match by name, which should only be used if a match by ID failed.
