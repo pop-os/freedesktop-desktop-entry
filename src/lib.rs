@@ -39,6 +39,22 @@ pub fn find_app_by_id<'a>(
         .find(|entry| entry.matches_id(app_id))
         // Only if that fails should we fall back to searching by name
         .or_else(|| entries.iter().find(|entry| entry.matches_name(app_id)))
+        // Or match by exact exec name
+        .or_else(|| {
+            entries
+                .iter()
+                .find(|entry| entry.exec().is_some_and(|exec| exec == app_id))
+        })
+        // Or any app with the exec in its arguments
+        .or_else(|| {
+            entries.iter().find(|entry| {
+                entry.exec().is_some_and(|exec| {
+                    exec.split_ascii_whitespace()
+                        .next()
+                        .is_some_and(|exec| exec == app_id)
+                })
+            })
+        })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -166,11 +182,17 @@ impl DesktopEntry {
         // If appid matches
         id == self.id()
             // or startup_wm_class matches
-            || self.startup_wm_class().map_or(false, |wm_class| wm_class == id)
+            || self.startup_wm_class().is_some_and(|wm_class| wm_class == id)
+            // or X-Ubuntu-Gettext-Domain was set
+            || self.ubuntu_gettext_domain.as_ref().is_some_and(|domain| *domain == id)
             // or the path itself matches
             || self.path.file_stem()
                 .and_then(|os_str| os_str.to_str())
-                .map_or(false, |name| name == id)
+                .is_some_and(|name| {
+                    name == id
+                        // Or match by last part of app ID
+                        || id.split('.').rev().next().is_some_and(|id| id == name)
+                })
     }
 
     // Match by name, which should only be used if a match by ID failed.
