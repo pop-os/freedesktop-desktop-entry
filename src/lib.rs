@@ -33,12 +33,34 @@ pub fn find_app_by_id<'a>(
     entries: &'a [DesktopEntry],
     app_id: Ascii<&str>,
 ) -> Option<&'a DesktopEntry> {
-    entries
+    // NOTE: Use `cargo run --example find_appid {{wm_app_id}}` to check if the match works.
+
+    // Prefer desktop entries whose startup wm class is a perfect match.
+    let match_by_wm_class = entries
         .iter()
-        // First match by app ID or wm class
-        .find(|entry| entry.matches_id(app_id))
-        // Only if that fails should we fall back to searching by name
+        .find(|entry| entry.matches_wm_class(app_id));
+
+    match_by_wm_class
+        // If no suitable wm class was found, search by entry file name.
+        .or_else(|| entries.iter().find(|entry| entry.matches_id(app_id)))
+        // Otherwise by name specified in the desktop entry.
         .or_else(|| entries.iter().find(|entry| entry.matches_name(app_id)))
+        // Or match by the exact exec command
+        .or_else(|| {
+            entries
+                .iter()
+                .find(|entry| entry.exec().is_some_and(|exec| exec == app_id))
+        })
+        // Or match by the first command in the exec
+        .or_else(|| {
+            entries.iter().find(|entry| {
+                entry.exec().is_some_and(|exec| {
+                    exec.split_ascii_whitespace()
+                        .next()
+                        .is_some_and(|exec| exec == app_id)
+                })
+            })
+        })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -160,20 +182,28 @@ impl DesktopEntry {
         de
     }
 
-    /// Check if this desktop entry matches a known app ID.
+    /// Entries with a matching `StartupWMClass` should be preferred over those that do not.
+    #[inline]
+    pub fn matches_wm_class(&self, id: Ascii<&str>) -> bool {
+        self.startup_wm_class().is_some_and(|wm_class| wm_class == id)
+    }
+
+    /// Match entry by desktop entry file name
     #[inline]
     pub fn matches_id(&self, id: Ascii<&str>) -> bool {
-        // If appid matches
+        // If the desktop entry appid matches
         id == self.id()
-            // or startup_wm_class matches
-            || self.startup_wm_class().map_or(false, |wm_class| wm_class == id)
             // or the path itself matches
             || self.path.file_stem()
                 .and_then(|os_str| os_str.to_str())
-                .map_or(false, |name| name == id)
+                .is_some_and(|name| {
+                    name == id
+                        // Or match by last part of app ID
+                        || id.split('.').rev().next().is_some_and(|id| id == name)
+                })
     }
 
-    // Match by name, which should only be used if a match by ID failed.
+    // Match by name specified in desktop entry, which should only be used if a match by ID failed.
     #[inline]
     pub fn matches_name(&self, name: Ascii<&str>) -> bool {
         self.name::<&str>(&[])
