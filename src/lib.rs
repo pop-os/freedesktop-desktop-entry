@@ -36,9 +36,7 @@ pub fn find_app_by_id<'a>(
     // NOTE: Use `cargo run --example find_appid {{wm_app_id}}` to check if the match works.
 
     // Prefer desktop entries whose startup wm class is a perfect match.
-    let match_by_wm_class = entries
-        .iter()
-        .find(|entry| entry.matches_wm_class(app_id));
+    let match_by_wm_class = entries.iter().find(|entry| entry.matches_wm_class(app_id));
 
     match_by_wm_class
         // If no suitable wm class was found, search by entry file name.
@@ -185,7 +183,8 @@ impl DesktopEntry {
     /// Entries with a matching `StartupWMClass` should be preferred over those that do not.
     #[inline]
     pub fn matches_wm_class(&self, id: Ascii<&str>) -> bool {
-        self.startup_wm_class().is_some_and(|wm_class| wm_class == id)
+        self.startup_wm_class()
+            .is_some_and(|wm_class| wm_class == id)
     }
 
     /// Match entry by desktop entry file name
@@ -290,6 +289,17 @@ impl DesktopEntry {
         self.desktop_entry("Exec")
     }
 
+    /// Path or name of an executable to check if app is really installed
+    #[inline]
+    pub fn try_exec(&self) -> Option<&str> {
+        self.desktop_entry("TryExec")
+    }
+
+    #[inline]
+    pub fn dbus_activatable(&self) -> bool {
+        self.desktop_entry_bool("DBusActivatable")
+    }
+
     /// Return categories
     #[inline]
     pub fn categories(&self) -> Option<Vec<&str>> {
@@ -310,21 +320,37 @@ impl DesktopEntry {
             .map(|e| e.split(';').collect())
     }
 
+    /// List of D-Bus interfaces supported by this application
+    #[inline]
+    pub fn implements(&self) -> Option<Vec<&str>> {
+        self.desktop_entry("Implements")
+            .map(|e| e.split(';').collect())
+    }
+
+    /// Application exists but shouldn't be shown in menus
     #[inline]
     pub fn no_display(&self) -> bool {
         self.desktop_entry_bool("NoDisplay")
     }
 
+    /// Desktop environments that should display this application
     #[inline]
     pub fn only_show_in(&self) -> Option<Vec<&str>> {
         self.desktop_entry("OnlyShowIn")
             .map(|e| e.split(';').collect())
     }
 
+    /// Desktop environments that should not display this application
     #[inline]
     pub fn not_show_in(&self) -> Option<Vec<&str>> {
         self.desktop_entry("NotShowIn")
             .map(|e| e.split(';').collect())
+    }
+
+    /// Treat application as if it does not exist
+    #[inline]
+    pub fn hidden(&self) -> bool {
+        self.desktop_entry_bool("Hidden")
     }
 
     #[inline]
@@ -352,9 +378,30 @@ impl DesktopEntry {
         self.desktop_entry_bool("Terminal")
     }
 
+    /// The app has a single main window only
+    #[inline]
+    pub fn single_main_window(&self) -> bool {
+        self.desktop_entry_bool("SingleMainWindow")
+    }
+
+    /// Working directory to run program in
+    #[inline]
+    pub fn path(&self) -> Option<&str> {
+        self.desktop_entry("Path")
+    }
+
     #[inline]
     pub fn type_(&self) -> Option<&str> {
         self.desktop_entry("Type")
+    }
+
+    /// URL to access if entry type is Link
+    pub fn url(&self) -> Option<&str> {
+        self.desktop_entry("URL")
+    }
+    /// Supported version of the Desktop Entry Specification
+    pub fn version(&self) -> Option<&str> {
+        self.desktop_entry("Version")
     }
 
     #[inline]
