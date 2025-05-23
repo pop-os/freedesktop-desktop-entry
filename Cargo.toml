@@ -17,3 +17,6 @@ thiserror = "2"
 xdg = "2"
 log = "0.4"
 unicase = "2.8.1"
+
+[dev-dependencies]
+tempfile = "3"
