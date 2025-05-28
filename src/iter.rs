@@ -37,7 +37,7 @@ impl Iterator for Iter {
                 None => {
                     while let Some(path) = self.directories_to_walk.pop_front() {
                         match fs::read_dir(&path) {
-                            Ok(dir) if !self.visited.insert(path) => {
+                            Ok(dir) if self.visited.insert(path.clone()) => {
                                 self.actively_walking = Some({
                                     // Pre-sort the walked directories as order of parsing affects appid matches.
                                     let mut entries = dir
@@ -70,7 +70,7 @@ impl Iterator for Iter {
                 if let Ok(metadata) = path.metadata() {
                     if metadata.is_dir() {
                         // Skip visited directories to mitigate against file system loops
-                        if !self.visited.insert(path.clone()) {
+                        if self.visited.insert(path.clone()) {
                             self.directories_to_walk.push_front(path);
                         }
                     } else if metadata.is_file()
