@@ -10,8 +10,12 @@ readme = "README.md"
 categories = ["os::unix-apis"]
 keywords = ["freedesktop", "desktop", "entry"]
 
+[features]
+default = ["gettext"]
+gettext = ["dep:gettext-rs"]
+
 [dependencies]
-gettext-rs = { version = "0.7", features = ["gettext-system"] }
+gettext-rs = { version = "0.7", features = ["gettext-system"], optional = true }
 memchr = "2"
 thiserror = "2"
 xdg = "2"
