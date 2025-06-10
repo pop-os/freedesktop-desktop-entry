@@ -473,6 +473,7 @@ impl DesktopEntry {
 
     #[inline(never)]
     pub(crate) fn localized_entry<'a>(
+        #[cfg_attr(not(feature = "gettext"), allow(unused_variables))]
         ubuntu_gettext_domain: Option<&str>,
         group: Option<&'a Group>,
         key: &str,
@@ -492,6 +493,7 @@ impl DesktopEntry {
                 }
             }
         }
+        #[cfg(feature = "gettext")]
         if let Some(domain) = ubuntu_gettext_domain {
             return Some(Cow::Owned(dgettext(domain, default_value)));
         }
@@ -507,7 +509,7 @@ impl DesktopEntry {
     ) -> Option<Vec<Cow<'a, str>>> {
         #[inline(never)]
         fn inner<'a>(
-            this: &'a DesktopEntry,
+            #[cfg_attr(not(feature = "gettext"), allow(unused_variables))] this: &'a DesktopEntry,
             group: Option<&'a Group>,
             key: &str,
             locales: &mut dyn Iterator<Item = &str>,
@@ -528,6 +530,7 @@ impl DesktopEntry {
                     }
                 }
             }
+            #[cfg(feature = "gettext")]
             if let Some(domain) = &this.ubuntu_gettext_domain {
                 return Some(
                     dgettext(domain, default_value)
@@ -649,6 +652,7 @@ pub fn default_paths() -> impl Iterator<Item = PathBuf> {
     data_dirs.into_iter().map(|d| d.join("applications"))
 }
 
+#[cfg(feature = "gettext")]
 #[inline]
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
     use gettextrs::{setlocale, LocaleCategory};
