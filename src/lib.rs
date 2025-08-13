@@ -610,6 +610,8 @@ impl PathSource {
     pub fn guess_from(path: &Path) -> PathSource {
         let base_dirs = BaseDirectories::new().unwrap();
         let data_home = base_dirs.get_data_home();
+        let mut nix_state = base_dirs.get_state_home();
+        nix_state.push("nix");
 
         if path.starts_with("/usr/share") {
             PathSource::System
@@ -621,6 +623,7 @@ impl PathSource {
             PathSource::SystemSnap
         } else if path.starts_with("/nix/var/nix/profiles/default")
             || path.starts_with("/nix/store")
+            || path.starts_with("/run/current-system/sw")
         {
             PathSource::Nix
         } else if path.to_string_lossy().contains("/flatpak/") {
@@ -629,6 +632,7 @@ impl PathSource {
             PathSource::Local
         } else if path.starts_with("/nix/var/nix/profiles/per-user")
             || path.to_string_lossy().contains(".nix")
+            || path.starts_with(nix_state.as_path())
         {
             PathSource::LocalNix
         } else {
