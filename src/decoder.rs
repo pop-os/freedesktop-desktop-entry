@@ -3,7 +3,6 @@
 
 use std::{
     fs::{self},
-    mem,
     path::{Path, PathBuf},
 };
 
@@ -27,6 +26,12 @@ pub enum DecodeError {
     KeyDoesNotExist,
     #[error("InvalidValue")]
     InvalidValue,
+}
+
+struct UnknownKey<'a> {
+    key: &'a str,
+    locale: String,
+    value: String,
 }
 
 impl DesktopEntry {
@@ -53,7 +58,8 @@ impl DesktopEntry {
             let mut active_keys: Option<ActiveKeys> = None;
             let mut ubuntu_gettext_domain = None;
 
-            let mut missing_keys = Vec::new();
+            let mut unknown_keys: Vec<UnknownKey> = Vec::new();
+
             for line in input.lines() {
                 process_line(
                     line,
@@ -62,24 +68,20 @@ impl DesktopEntry {
                     &mut active_keys,
                     &mut ubuntu_gettext_domain,
                     locales_filter.as_deref(),
-                    &mut missing_keys,
+                    &mut unknown_keys,
                 )?;
             }
-            if missing_keys.len() > 0 {
-                let mut check_again = mem::take(&mut missing_keys);
-                for missing in check_again.drain(..) {
-                    process_line(
-                        missing,
-                        &mut groups,
-                        &mut active_group,
-                        &mut active_keys,
-                        &mut ubuntu_gettext_domain,
-                        locales_filter.as_deref(),
-                        &mut missing_keys,
-                    )?;
-                }
-                if missing_keys.len() > 0 {
-                    return Err(DecodeError::KeyDoesNotExist);
+
+            // insert keys which have no group
+            for unknown_key in unknown_keys.drain(..) {
+                match &mut active_group {
+                    Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
+                        Some((_, locale_map)) => {
+                            locale_map.insert(unknown_key.locale, unknown_key.value);
+                        }
+                        None => return Err(DecodeError::KeyDoesNotExist),
+                    },
+                    None => return Err(DecodeError::KeyDoesNotExist),
                 }
             }
 
@@ -162,7 +164,7 @@ fn process_line<'a>(
     active_keys: &mut Option<ActiveKeys>,
     ubuntu_gettext_domain: &mut Option<String>,
     locales_filter: Option<&[&str]>,
-    missing_keys: &mut Vec<&'a str>,
+    unknown_keys: &mut Vec<UnknownKey<'a>>,
 ) -> Result<(), DecodeError> {
     if line.trim().is_empty() || line.starts_with('#') {
         return Ok(());
@@ -170,24 +172,21 @@ fn process_line<'a>(
 
     let line_bytes = line.as_bytes();
 
+    // if group
     if line_bytes[0] == b'[' {
-        if missing_keys.len() > 0 {
-            let mut check_again = mem::take(missing_keys);
-            for missing in check_again.drain(..) {
-                process_line(
-                    missing,
-                    groups,
-                    active_group,
-                    active_keys,
-                    ubuntu_gettext_domain,
-                    locales_filter,
-                    missing_keys,
-                )?;
-            }
-            if missing_keys.len() > 0 {
-                return Err(DecodeError::KeyDoesNotExist);
+        // insert keys which have no group
+        for unknown_key in unknown_keys.drain(..) {
+            match active_group {
+                Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
+                    Some((_, locale_map)) => {
+                        locale_map.insert(unknown_key.locale, unknown_key.value);
+                    }
+                    None => return Err(DecodeError::KeyDoesNotExist),
+                },
+                None => return Err(DecodeError::KeyDoesNotExist),
             }
         }
+
         if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
             let group_name = &line[1..end + 1];
 
@@ -217,7 +216,9 @@ fn process_line<'a>(
                 group: Group::default(),
             });
         }
-    } else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
+    }
+    // else, if value
+    else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
         let key = &line[..delimiter];
         let value = format_value(&line[delimiter + 1..])?;
 
@@ -228,26 +229,29 @@ fn process_line<'a>(
         // if locale
         if key.as_bytes()[key.len() - 1] == b']' {
             if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
-                // verify that the name is the same of active key ?
-                // or we can assume this is the case
-                // let local_key = &key[..start];
-
                 let locale = &key[start + 1..key.len() - 1];
+
+                let key = &key[..start];
 
                 match locales_filter {
                     Some(locales_filter) if !locales_filter.iter().any(|l| *l == locale) => {
-                        return Ok(())
+                        return Ok(());
                     }
                     _ => (),
                 }
 
-                match active_keys {
-                    Some(active_keys) => {
-                        active_keys.locales.insert(locale.to_string(), value);
-                    }
-                    None => {
-                        missing_keys.push(line);
-                    }
+                // we verify that the name is the same of active key
+                // even tho this is forbidden by the spec, nautilus does this for example
+                if let Some(active_keys) = active_keys
+                    && &active_keys.key_name == key
+                {
+                    active_keys.locales.insert(locale.to_string(), value);
+                } else {
+                    unknown_keys.push(UnknownKey {
+                        key,
+                        locale: locale.to_string(),
+                        value,
+                    });
                 }
 
                 return Ok(());

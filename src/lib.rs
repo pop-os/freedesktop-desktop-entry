@@ -4,6 +4,8 @@
 mod decoder;
 mod exec;
 mod iter;
+#[cfg(test)]
+mod tests;
 
 pub use self::iter::Iter;
 pub use decoder::DecodeError;
@@ -280,7 +282,7 @@ impl DesktopEntry {
 
     /// This is an human readable description of the desktop file.
     #[inline]
-    pub fn comment<L: AsRef<str>>(&self, locales: &[L]) -> Option<Cow<str>> {
+    pub fn comment<'a, L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Cow<'a, str>> {
         self.desktop_entry_localized("Comment", locales)
     }
 
@@ -309,7 +311,7 @@ impl DesktopEntry {
 
     /// Return keywords
     #[inline]
-    pub fn keywords<L: AsRef<str>>(&self, locales: &[L]) -> Option<Vec<Cow<str>>> {
+    pub fn keywords<'a, L: AsRef<str>>(&'a self, locales: &[L]) -> Option<Vec<Cow<'a, str>>> {
         self.localized_entry_splitted(self.groups.desktop_entry(), "Keywords", locales)
     }
 
@@ -457,7 +459,11 @@ impl DesktopEntry {
     }
 
     #[inline]
-    pub fn action_name<L: AsRef<str>>(&self, action: &str, locales: &[L]) -> Option<Cow<str>> {
+    pub fn action_name<'a, L: AsRef<str>>(
+        &'a self,
+        action: &str,
+        locales: &[L],
+    ) -> Option<Cow<'a, str>> {
         self.action_entry_localized(action, "Name", locales)
     }
 
@@ -659,7 +665,7 @@ pub fn default_paths() -> impl Iterator<Item = PathBuf> {
 #[cfg(feature = "gettext")]
 #[inline]
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
-    use gettextrs::{setlocale, LocaleCategory};
+    use gettextrs::{LocaleCategory, setlocale};
     setlocale(LocaleCategory::LcAll, "");
     gettextrs::dgettext(domain, message)
 }
