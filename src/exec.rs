@@ -186,7 +186,7 @@ mod test {
 
     use std::path::PathBuf;
 
-    use crate::{get_languages_from_env, DesktopEntry};
+    use crate::{DesktopEntry, get_languages_from_env};
 
     use super::ExecError;
 
