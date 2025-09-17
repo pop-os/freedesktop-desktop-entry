@@ -614,9 +614,9 @@ impl PathSource {
     /// Note that this is a best-effort guesting function, and its results should be treated as
     /// such (e.g.: non-canonical).
     pub fn guess_from(path: &Path) -> PathSource {
-        let base_dirs = BaseDirectories::new().unwrap();
-        let data_home = base_dirs.get_data_home();
-        let mut nix_state = base_dirs.get_state_home();
+        let base_dirs = BaseDirectories::new();
+        let data_home = base_dirs.get_data_home().unwrap();
+        let mut nix_state = base_dirs.get_state_home().unwrap();
         nix_state.push("nix");
 
         if path.starts_with("/usr/share") {
@@ -654,9 +654,9 @@ impl PathSource {
 /// Panics in case determining the current home directory fails.
 #[cold]
 pub fn default_paths() -> impl Iterator<Item = PathBuf> {
-    let base_dirs = BaseDirectories::new().unwrap();
+    let base_dirs = BaseDirectories::new();
     let mut data_dirs: Vec<PathBuf> = vec![];
-    data_dirs.push(base_dirs.get_data_home());
+    data_dirs.push(base_dirs.get_data_home().unwrap());
     data_dirs.append(&mut base_dirs.get_data_dirs());
 
     data_dirs.into_iter().map(|d| d.join("applications"))
