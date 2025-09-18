@@ -243,7 +243,8 @@ fn process_line<'a>(
                 // we verify that the name is the same of active key
                 // even tho this is forbidden by the spec, nautilus does this for example
                 if let Some(active_keys) = active_keys
-                    && &active_keys.key_name == key
+                    .as_mut()
+                    .filter(|active_keys| active_keys.key_name == key)
                 {
                     active_keys.locales.insert(locale.to_string(), value);
                 } else {
