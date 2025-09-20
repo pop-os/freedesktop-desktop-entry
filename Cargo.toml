@@ -2,7 +2,7 @@
 name = "freedesktop-desktop-entry"
 version = "0.7.16"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
-edition = "2024"
+edition = "2021"
 repository = "https://github.com/pop-os/freedesktop-desktop-entry"
 description = "Freedesktop Desktop Entry Specification"
 license = "MPL-2.0"
