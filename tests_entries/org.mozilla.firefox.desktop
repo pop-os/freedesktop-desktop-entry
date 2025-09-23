@@ -273,6 +273,7 @@ Exec=firefox --private-window %u
 
 [Desktop Action profile-manager-window]
 Name=Open the Profile Manager
+Name[ar]=افتح مدير الملف الشخصي
 Name[cs]=Správa profilů
 Name[de]=Profilverwaltung öffnen
 Name[fr]=Ouvrir le gestionnaire de profils
