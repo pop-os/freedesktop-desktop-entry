@@ -2,6 +2,7 @@
 Version=1.0
 Name=Firefox
 GenericName=Web Browser
+GenericName[ar]=متصفح وِب
 GenericName[ca]=Navegador web
 GenericName[cs]=Webový prohlížeč
 GenericName[es]=Navegador web
@@ -22,6 +23,7 @@ GenericName[pt_BR]=Navegador Web
 GenericName[sk]=Internetový prehliadač
 GenericName[sv]=Webbläsare
 Comment=Browse the Web
+Comment[ar]=تصفح الوِب
 Comment[ca]=Navegueu per el web
 Comment[cs]=Prohlížení stránek World Wide Webu
 Comment[de]=Im Internet surfen
