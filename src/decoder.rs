@@ -8,6 +8,7 @@ use std::{
 
 use crate::{DesktopEntry, Group};
 use crate::{Groups, LocaleMap};
+use bstr::ByteSlice;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -107,7 +108,7 @@ impl DesktopEntry {
             }
 
             Ok(DesktopEntry {
-                appid: appid.to_string(),
+                appid,
                 groups,
                 path,
                 ubuntu_gettext_domain,
@@ -133,14 +134,28 @@ impl DesktopEntry {
 }
 
 #[inline]
-fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<&str, DecodeError> {
-    let appid = path
+fn get_app_id<P: AsRef<Path> + ?Sized>(path: &P) -> Result<String, DecodeError> {
+    let path_as_bytes = path
         .as_ref()
-        .file_stem()
-        .ok_or(DecodeError::AppID)?
-        .to_str()
+        .as_os_str()
+        .as_encoded_bytes()
+        .strip_suffix(b".desktop")
         .ok_or(DecodeError::AppID)?;
-    Ok(appid)
+
+    Ok(
+        if let Some((_prefix, entry)) = path_as_bytes.rsplit_once_str("/applications/") {
+            String::from_utf8(entry.replace(b"/", b"-"))
+                .ok()
+                .ok_or(DecodeError::AppID)?
+        } else {
+            path.as_ref()
+                .file_stem()
+                .ok_or(DecodeError::AppID)?
+                .to_str()
+                .ok_or(DecodeError::AppID)?
+                .to_owned()
+        },
+    )
 }
 
 #[derive(Debug)]

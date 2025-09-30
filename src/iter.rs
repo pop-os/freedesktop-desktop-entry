@@ -37,7 +37,7 @@ impl Iterator for Iter {
                 None => {
                     while let Some(path) = self.directories_to_walk.pop_front() {
                         match fs::read_dir(&path) {
-                            Ok(dir) if self.visited.insert(path.clone()) => {
+                            Ok(dir) => {
                                 self.actively_walking = Some({
                                     // Pre-sort the walked directories as order of parsing affects appid matches.
                                     let mut entries = dir
