@@ -62,10 +62,16 @@ impl Iterator for Iter {
             };
 
             'inner: while let Some(mut path) = paths.pop_front() {
-                path = match path.canonicalize() {
-                    Ok(canonicalized) => canonicalized,
-                    Err(_) => continue 'inner,
-                };
+                if !path.exists() {
+                    continue 'inner;
+                }
+
+                if path.is_dir() {
+                    path = match path.canonicalize() {
+                        Ok(canonicalized) => canonicalized,
+                        Err(_) => continue 'inner,
+                    };
+                }
 
                 if let Ok(metadata) = path.metadata() {
                     if metadata.is_dir() {

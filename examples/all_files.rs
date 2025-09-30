@@ -1,7 +1,7 @@
 // Copyright 2021 System76 <info@system76.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use freedesktop_desktop_entry::{Iter, PathSource, default_paths, get_languages_from_env};
+use freedesktop_desktop_entry::{default_paths, get_languages_from_env, Iter, PathSource};
 
 fn main() {
     let locales = get_languages_from_env();
