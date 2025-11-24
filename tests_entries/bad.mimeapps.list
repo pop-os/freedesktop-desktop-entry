@@ -1,0 +1,3 @@
+[Default Applications]
+not-a-mime=fo.desktop; # Invalid mime type
+ text/html =browser.desktop; # Ignore white space in key

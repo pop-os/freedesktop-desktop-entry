@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{DesktopEntry, Group};
+use crate::{DesktopEntry, Group, MimeApps, Thumbnail};
 use crate::{Groups, LocaleMap};
 use bstr::ByteSlice;
 use thiserror::Error;
@@ -55,57 +55,14 @@ impl DesktopEntry {
             let appid = get_app_id(&path)?;
 
             let mut groups = Groups::default();
-            let mut active_group: Option<ActiveGroup> = None;
-            let mut active_keys: Option<ActiveKeys> = None;
             let mut ubuntu_gettext_domain = None;
 
-            let mut unknown_keys: Vec<UnknownKey> = Vec::new();
-
-            for line in input.lines() {
-                process_line(
-                    line,
-                    &mut groups,
-                    &mut active_group,
-                    &mut active_keys,
-                    &mut ubuntu_gettext_domain,
-                    locales_filter.as_deref(),
-                    &mut unknown_keys,
-                )?;
-            }
-
-            // insert keys which have no group
-            for unknown_key in unknown_keys.drain(..) {
-                match &mut active_group {
-                    Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
-                        Some((_, locale_map)) => {
-                            locale_map.insert(unknown_key.locale, unknown_key.value);
-                        }
-                        None => return Err(DecodeError::KeyDoesNotExist),
-                    },
-                    None => return Err(DecodeError::KeyDoesNotExist),
-                }
-            }
-
-            if let Some(active_keys) = active_keys.take() {
-                match &mut active_group {
-                    Some(active_group) => {
-                        active_group.group.0.insert(
-                            active_keys.key_name,
-                            (active_keys.default_value, active_keys.locales),
-                        );
-                    }
-                    None => return Err(DecodeError::KeyValueWithoutAGroup),
-                }
-            }
-
-            if let Some(mut group) = active_group.take() {
-                groups
-                    .0
-                    .entry(group.group_name)
-                    .or_insert_with(|| Group::default())
-                    .0
-                    .append(&mut group.group.0);
-            }
+            process_lines(
+                input,
+                &mut groups,
+                &mut ubuntu_gettext_domain,
+                locales_filter.as_deref(),
+            )?;
 
             Ok(DesktopEntry {
                 appid,
@@ -130,6 +87,68 @@ impl DesktopEntry {
         let path: PathBuf = path.into();
         let input = fs::read_to_string(&path)?;
         Self::from_str(path, &input, locales_filter)
+    }
+}
+
+impl MimeApps {
+    pub fn from_str(path: impl Into<PathBuf>, input: &str) -> Result<MimeApps, DecodeError> {
+        #[inline(never)]
+        fn inner<'a>(path: PathBuf, input: &'a str) -> Result<MimeApps, DecodeError> {
+            let path: PathBuf = path.into();
+
+            let mut groups = Groups::default();
+            let mut ubuntu_gettext_domain = None;
+
+            process_lines(
+                input,
+                &mut groups,
+                &mut ubuntu_gettext_domain,
+                None::<&[&str]>,
+            )?;
+
+            Ok(MimeApps { groups, path })
+        }
+
+        inner(path.into(), input)
+    }
+
+    /// Return an owned [`MimeApps`]
+    #[inline]
+    pub fn from_path(path: impl Into<PathBuf>) -> Result<MimeApps, DecodeError> {
+        let path: PathBuf = path.into();
+        let input = fs::read_to_string(&path)?;
+        Self::from_str(path, &input)
+    }
+}
+
+impl Thumbnail {
+    pub fn from_str(path: impl Into<PathBuf>, input: &str) -> Result<Thumbnail, DecodeError> {
+        #[inline(never)]
+        fn inner<'a>(path: PathBuf, input: &'a str) -> Result<Thumbnail, DecodeError> {
+            let path: PathBuf = path.into();
+
+            let mut groups = Groups::default();
+            let mut ubuntu_gettext_domain = None;
+
+            process_lines(
+                input,
+                &mut groups,
+                &mut ubuntu_gettext_domain,
+                None::<&[&str]>,
+            )?;
+
+            Ok(Thumbnail { groups, path })
+        }
+
+        inner(path.into(), input)
+    }
+
+    /// Return an owned [`Thumbnail`]
+    #[inline]
+    pub fn from_path(path: impl Into<PathBuf>) -> Result<Thumbnail, DecodeError> {
+        let path: PathBuf = path.into();
+        let input = fs::read_to_string(&path)?;
+        Self::from_str(path, &input)
     }
 }
 
@@ -169,6 +188,66 @@ struct ActiveKeys {
     key_name: String,
     default_value: String,
     locales: LocaleMap,
+}
+
+#[inline(never)]
+fn process_lines<'a>(
+    input: &'a str,
+    groups: &mut Groups,
+    ubuntu_gettext_domain: &mut Option<String>,
+    locales_filter: Option<&[&str]>,
+) -> Result<(), DecodeError> {
+    let mut active_group: Option<ActiveGroup> = None;
+    let mut active_keys: Option<ActiveKeys> = None;
+    let mut unknown_keys: Vec<UnknownKey> = Vec::new();
+
+    for line in input.lines() {
+        process_line(
+            &line,
+            groups,
+            &mut active_group,
+            &mut active_keys,
+            ubuntu_gettext_domain,
+            locales_filter.as_deref(),
+            &mut unknown_keys,
+        )?;
+    }
+
+    // insert keys which have no group
+    for unknown_key in unknown_keys.drain(..) {
+        match &mut active_group {
+            Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
+                Some((_, locale_map)) => {
+                    locale_map.insert(unknown_key.locale, unknown_key.value);
+                }
+                None => return Err(DecodeError::KeyDoesNotExist),
+            },
+            None => return Err(DecodeError::KeyDoesNotExist),
+        }
+    }
+
+    if let Some(active_keys) = active_keys.take() {
+        match &mut active_group {
+            Some(active_group) => {
+                active_group.group.0.insert(
+                    active_keys.key_name,
+                    (active_keys.default_value, active_keys.locales),
+                );
+            }
+            None => return Err(DecodeError::KeyValueWithoutAGroup),
+        }
+    }
+
+    if let Some(mut group) = active_group.take() {
+        groups
+            .0
+            .entry(group.group_name)
+            .or_insert_with(|| Group::default())
+            .0
+            .append(&mut group.group.0);
+    }
+
+    Ok(())
 }
 
 #[inline(never)]

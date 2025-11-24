@@ -1,0 +1,7 @@
+[Default Applications]
+text/plain=com.system76.CosmicEdit.desktop;
+image/png=org.gnome.eog.desktop;
+[Added Associations]
+application/pdf=evince.desktop;okular.desktop;
+[Removed Associations]
+audio/mpeg=some-old-player.desktop;

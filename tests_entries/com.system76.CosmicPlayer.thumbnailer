@@ -1,0 +1,4 @@
+[Thumbnailer Entry]
+TryExec=cosmic-player
+Exec=cosmic-player --thumbnail %o --size %s %u
+MimeType=application/mxf;application/ram;
