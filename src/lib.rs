@@ -3,13 +3,15 @@
 
 mod decoder;
 mod exec;
+mod generic_entry;
 mod iter;
 #[cfg(test)]
 mod tests;
 
 pub use self::iter::Iter;
-pub use decoder::DecodeError;
+pub use decoder::{parse_line, DecodeError};
 pub use exec::ExecError;
+pub use generic_entry::GenericEntry;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
@@ -665,7 +667,7 @@ pub fn default_paths() -> impl Iterator<Item = PathBuf> {
 #[cfg(feature = "gettext")]
 #[inline]
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
-    use gettextrs::{LocaleCategory, setlocale};
+    use gettextrs::{setlocale, LocaleCategory};
     setlocale(LocaleCategory::LcAll, "");
     gettextrs::dgettext(domain, message)
 }

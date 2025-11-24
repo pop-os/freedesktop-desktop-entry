@@ -1,0 +1,10 @@
+# This is a comment
+
+TryExec=invalid
+[Thumbnailer Entry]
+TryExec=invalid
+[Thumbnailer Entry]
+TryExec=invalid
+TryExec=cosmic-player
+Exec=cosmic-player --thumbnail %o --size %s %u
+MimeType=application/mxf;application/ram

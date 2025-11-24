@@ -23,10 +23,52 @@ pub enum DecodeError {
     KeyValueWithoutAGroup,
     #[error("InvalidKey. Accepted: A-Za-z0-9")]
     InvalidKey,
-    #[error("KeyDoesNotExist, this can happens when a localized key has no default value")]
+    #[error("KeyDoesNotExist, this can happen when a localized key has no default value")]
     KeyDoesNotExist,
     #[error("InvalidValue")]
     InvalidValue,
+    #[error("InvalidGroup")]
+    InvalidGroup,
+    #[error("InvalidEntry")]
+    InvalidEntry,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Line<'a> {
+    Group(&'a str),
+    Entry(&'a str, &'a str),
+    Comment,
+}
+
+#[inline(never)]
+pub fn parse_line<'a>(line: &'a str) -> Result<Line<'a>, DecodeError> {
+    if line.trim().is_empty() || line.starts_with('#') {
+        return Ok(Line::Comment);
+    }
+
+    let line_bytes = line.as_bytes();
+
+    // if group
+    if line_bytes[0] == b'[' {
+        if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
+            let group_name = &line[1..end + 1];
+            return Ok(Line::Group(group_name));
+        } else {
+            return Err(DecodeError::InvalidGroup);
+        }
+    }
+    // else, if entry
+    else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
+        let key = &line[..delimiter];
+        let value = &line[delimiter + 1..];
+
+        if key.is_empty() {
+            return Err(DecodeError::InvalidKey);
+        }
+        return Ok(Line::Entry(key, value));
+    } else {
+        return Err(DecodeError::InvalidEntry);
+    }
 }
 
 struct UnknownKey<'a> {
@@ -181,29 +223,20 @@ fn process_line<'a>(
     locales_filter: Option<&[&str]>,
     unknown_keys: &mut Vec<UnknownKey<'a>>,
 ) -> Result<(), DecodeError> {
-    if line.trim().is_empty() || line.starts_with('#') {
-        return Ok(());
-    }
-
-    let line_bytes = line.as_bytes();
-
-    // if group
-    if line_bytes[0] == b'[' {
-        // insert keys which have no group
-        for unknown_key in unknown_keys.drain(..) {
-            match active_group {
-                Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
-                    Some((_, locale_map)) => {
-                        locale_map.insert(unknown_key.locale, unknown_key.value);
-                    }
+    match parse_line(line)? {
+        Line::Group(group_name) => {
+            // insert keys which have no group
+            for unknown_key in unknown_keys.drain(..) {
+                match active_group {
+                    Some(active_group) => match active_group.group.0.get_mut(unknown_key.key) {
+                        Some((_, locale_map)) => {
+                            locale_map.insert(unknown_key.locale, unknown_key.value);
+                        }
+                        None => return Err(DecodeError::KeyDoesNotExist),
+                    },
                     None => return Err(DecodeError::KeyDoesNotExist),
-                },
-                None => return Err(DecodeError::KeyDoesNotExist),
+                }
             }
-        }
-
-        if let Some(end) = memchr::memrchr(b']', &line_bytes[1..]) {
-            let group_name = &line[1..end + 1];
 
             if let Some(active_keys) = active_keys.take() {
                 match active_group {
@@ -231,71 +264,66 @@ fn process_line<'a>(
                 group: Group::default(),
             });
         }
-    }
-    // else, if value
-    else if let Some(delimiter) = memchr::memchr(b'=', line_bytes) {
-        let key = &line[..delimiter];
-        let value = format_value(&line[delimiter + 1..])?;
+        Line::Entry(key, value) => {
+            let value = format_value(value)?;
 
-        if key.is_empty() {
-            return Err(DecodeError::InvalidKey);
-        }
+            // if locale
+            if key.as_bytes()[key.len() - 1] == b']' {
+                if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
+                    let locale = &key[start + 1..key.len() - 1];
 
-        // if locale
-        if key.as_bytes()[key.len() - 1] == b']' {
-            if let Some(start) = memchr::memchr(b'[', key.as_bytes()) {
-                let locale = &key[start + 1..key.len() - 1];
+                    let key = &key[..start];
 
-                let key = &key[..start];
-
-                match locales_filter {
-                    Some(locales_filter) if !locales_filter.iter().any(|l| *l == locale) => {
-                        return Ok(());
+                    match locales_filter {
+                        Some(locales_filter) if !locales_filter.iter().any(|l| *l == locale) => {
+                            return Ok(());
+                        }
+                        _ => (),
                     }
-                    _ => (),
-                }
 
-                // we verify that the name is the same of active key
-                // even tho this is forbidden by the spec, nautilus does this for example
-                if let Some(active_keys) = active_keys
-                    .as_mut()
-                    .filter(|active_keys| active_keys.key_name == key)
-                {
-                    active_keys.locales.insert(locale.to_string(), value);
-                } else {
-                    unknown_keys.push(UnknownKey {
-                        key,
-                        locale: locale.to_string(),
-                        value,
-                    });
-                }
+                    // we verify that the name is the same of active key
+                    // even tho this is forbidden by the spec, nautilus does this for example
+                    if let Some(active_keys) = active_keys
+                        .as_mut()
+                        .filter(|active_keys| active_keys.key_name == key)
+                    {
+                        active_keys.locales.insert(locale.to_string(), value);
+                    } else {
+                        unknown_keys.push(UnknownKey {
+                            key,
+                            locale: locale.to_string(),
+                            value,
+                        });
+                    }
 
+                    return Ok(());
+                }
+            }
+
+            if key == "X-Ubuntu-Gettext-Domain" {
+                *ubuntu_gettext_domain = Some(value.to_string());
                 return Ok(());
             }
-        }
 
-        if key == "X-Ubuntu-Gettext-Domain" {
-            *ubuntu_gettext_domain = Some(value.to_string());
-            return Ok(());
-        }
-
-        if let Some(active_keys) = active_keys.take() {
-            match active_group {
-                Some(active_group) => {
-                    active_group.group.0.insert(
-                        active_keys.key_name,
-                        (active_keys.default_value, active_keys.locales),
-                    );
+            if let Some(active_keys) = active_keys.take() {
+                match active_group {
+                    Some(active_group) => {
+                        active_group.group.0.insert(
+                            active_keys.key_name,
+                            (active_keys.default_value, active_keys.locales),
+                        );
+                    }
+                    None => return Err(DecodeError::KeyValueWithoutAGroup),
                 }
-                None => return Err(DecodeError::KeyValueWithoutAGroup),
             }
+            active_keys.replace(ActiveKeys {
+                // todo: verify that the key only contains A-Za-z0-9 ?
+                key_name: key.trim().to_string(),
+                default_value: value,
+                locales: LocaleMap::default(),
+            });
         }
-        active_keys.replace(ActiveKeys {
-            // todo: verify that the key only contains A-Za-z0-9 ?
-            key_name: key.trim().to_string(),
-            default_value: value,
-            locales: LocaleMap::default(),
-        });
+        _ => (),
     }
     Ok(())
 }
@@ -365,4 +393,51 @@ fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
     }
 
     v
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{decoder::Line, parse_line};
+
+    #[test]
+    fn test_parse_empty_comment() {
+        let line = parse_line("").unwrap();
+
+        assert_eq!(line, Line::Comment);
+    }
+
+    #[test]
+    fn test_parse_hash_comment() {
+        let line = parse_line("# comment").unwrap();
+
+        assert_eq!(line, Line::Comment);
+    }
+
+    #[test]
+    fn test_parse_group() {
+        let line = parse_line("[Some Group]").unwrap();
+
+        assert_eq!(line, Line::Group("Some Group"));
+    }
+
+    #[test]
+    fn test_parse_entry() {
+        let line = parse_line("key=value").unwrap();
+
+        assert_eq!(line, Line::Entry("key", "value"));
+    }
+
+    #[test]
+    fn test_group_error() {
+        let result = parse_line("[Some Group");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_entry_error() {
+        let result = parse_line("invalid entry");
+
+        assert!(result.is_err());
+    }
 }
