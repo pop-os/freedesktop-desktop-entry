@@ -40,7 +40,7 @@ pub enum Line<'a> {
     Comment(&'a str),
 }
 
-#[inline(never)]
+#[inline]
 pub fn parse_line<'a>(line: &'a str) -> Result<Line<'a>, DecodeError> {
     if line.trim().is_empty() || line.starts_with('#') {
         return Ok(Line::Comment(&line));
