@@ -37,13 +37,13 @@ pub enum DecodeError {
 pub enum Line<'a> {
     Group(&'a str),
     Entry(&'a str, &'a str),
-    Comment,
+    Comment(&'a str),
 }
 
 #[inline(never)]
 pub fn parse_line<'a>(line: &'a str) -> Result<Line<'a>, DecodeError> {
     if line.trim().is_empty() || line.starts_with('#') {
-        return Ok(Line::Comment);
+        return Ok(Line::Comment(&line));
     }
 
     let line_bytes = line.as_bytes();
@@ -403,14 +403,14 @@ mod test {
     fn test_parse_empty_comment() {
         let line = parse_line("").unwrap();
 
-        assert_eq!(line, Line::Comment);
+        assert_eq!(line, Line::Comment(""));
     }
 
     #[test]
     fn test_parse_hash_comment() {
         let line = parse_line("# comment").unwrap();
 
-        assert_eq!(line, Line::Comment);
+        assert_eq!(line, Line::Comment("# comment"));
     }
 
     #[test]
