@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    decoder::{parse_line, Line},
+    decoder::{format_value, parse_line, Line},
     DecodeError,
 };
 
@@ -33,7 +33,7 @@ impl Groups {
     }
 }
 
-/// Parse any INI formatted file into a generic "group/entry" struct. Any duplicate groups or keys
+/// Parse files based on the desktop entry spec. Any duplicate groups or keys
 /// will be overridden by the last parsed value and any entries without a group will be ignored.
 #[derive(Debug, Clone)]
 pub struct GenericEntry {
@@ -61,7 +61,7 @@ impl GenericEntry {
                     }
                     Line::Entry(key, value) => {
                         if let Some((_, group)) = active_group.as_mut() {
-                            group.0.insert(key.to_string(), value.to_string());
+                            group.0.insert(key.to_string(), format_value(value)?);
                         }
                     }
                     _ => (),
