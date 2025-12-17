@@ -330,7 +330,7 @@ fn process_line<'a>(
 
 // https://specifications.freedesktop.org/desktop-entry-spec/latest/value-types.html
 #[inline]
-fn format_value(input: &str) -> Result<String, DecodeError> {
+pub(crate) fn format_value(input: &str) -> Result<String, DecodeError> {
     let input = if let Some(input) = input.strip_prefix(" ") {
         input
     } else {
