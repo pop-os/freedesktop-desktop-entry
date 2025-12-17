@@ -71,6 +71,53 @@ pub fn parse_line<'a>(line: &'a str) -> Result<Line<'a>, DecodeError> {
     }
 }
 
+fn group_entry_from_str(
+    input: &str,
+    group: &str,
+    entry: &str,
+) -> Result<Option<String>, DecodeError> {
+    let mut in_group = false;
+
+    for line in input.lines() {
+        match parse_line(line)? {
+            Line::Group(parsed_group) => {
+                in_group = parsed_group == group;
+            }
+            Line::Entry(key, value) => {
+                if in_group && key == entry {
+                    return Ok(Some(format_value(value)?));
+                }
+            }
+            _ => (),
+        }
+    }
+
+    Ok(None)
+}
+
+/// Return a single entry from a specified group
+pub fn group_entry_from_path(
+    path: impl Into<PathBuf>,
+    group: &str,
+    entry: &str,
+) -> Result<Option<String>, DecodeError> {
+    let path: PathBuf = path.into();
+    let input = fs::read_to_string(&path)?;
+
+    group_entry_from_str(&input, group, entry)
+}
+
+/// Return a single desktop entry
+pub fn desktop_entry_from_path(
+    path: impl Into<PathBuf>,
+    entry: &str,
+) -> Result<Option<String>, DecodeError> {
+    let path: PathBuf = path.into();
+    let input = fs::read_to_string(&path)?;
+
+    group_entry_from_str(&input, "Desktop Entry", entry)
+}
+
 struct UnknownKey<'a> {
     key: &'a str,
     locale: String,

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::DesktopEntry;
+use crate::{desktop_entry_from_path, group_entry_from_path, DesktopEntry};
 
 #[test]
 fn nautilus_name_french() {
@@ -26,4 +26,38 @@ fn translatable_inverted_key_at_the_end() {
     .unwrap();
 
     assert!(de.keywords(&[] as &[&str]).is_some());
+}
+
+#[test]
+fn get_single_group_entry() {
+    let entry = group_entry_from_path(
+        PathBuf::from("tests_entries/org.gnome.Nautilus.desktop"),
+        "Desktop Entry",
+        "Exec",
+    )
+    .unwrap();
+
+    assert_eq!(entry.unwrap(), "nautilus --new-window %U");
+}
+
+#[test]
+fn get_single_desktop_entry() {
+    let entry = desktop_entry_from_path(
+        PathBuf::from("tests_entries/org.gnome.Nautilus.desktop"),
+        "Exec",
+    )
+    .unwrap();
+
+    assert_eq!(entry.unwrap(), "nautilus --new-window %U");
+}
+
+#[test]
+fn get_invalid_single_desktop_entry() {
+    let entry = desktop_entry_from_path(
+        PathBuf::from("tests_entries/org.gnome.Nautilus.desktop"),
+        "Invalid",
+    )
+    .unwrap();
+
+    assert!(entry.is_none());
 }
