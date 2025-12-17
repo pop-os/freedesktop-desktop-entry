@@ -9,7 +9,7 @@ mod iter;
 mod tests;
 
 pub use self::iter::Iter;
-pub use decoder::{parse_line, DecodeError};
+pub use decoder::{parse_line, DecodeError, Line};
 pub use exec::ExecError;
 pub use generic_entry::GenericEntry;
 use std::borrow::Cow;
