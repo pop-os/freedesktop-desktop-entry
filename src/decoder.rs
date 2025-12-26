@@ -114,6 +114,18 @@ impl DesktopEntry {
                     &mut unknown_keys,
                 )?;
             }
+            
+            if let Some(active_keys) = active_keys.take() {
+                match &mut active_group {
+                    Some(active_group) => {
+                        active_group.group.0.insert(
+                            active_keys.key_name,
+                            (active_keys.default_value, active_keys.locales),
+                        );
+                    }
+                    None => return Err(DecodeError::KeyValueWithoutAGroup),
+                }
+            }
 
             // insert keys which have no group
             for unknown_key in unknown_keys.drain(..) {
@@ -125,18 +137,6 @@ impl DesktopEntry {
                         None => return Err(DecodeError::KeyDoesNotExist),
                     },
                     None => return Err(DecodeError::KeyDoesNotExist),
-                }
-            }
-
-            if let Some(active_keys) = active_keys.take() {
-                match &mut active_group {
-                    Some(active_group) => {
-                        active_group.group.0.insert(
-                            active_keys.key_name,
-                            (active_keys.default_value, active_keys.locales),
-                        );
-                    }
-                    None => return Err(DecodeError::KeyValueWithoutAGroup),
                 }
             }
 
