@@ -63,6 +63,12 @@ pub fn find_app_by_id<'a>(
                 })
             })
         })
+        // Match for snap apps
+        .or_else(|| {
+            entries
+                .iter()
+                .find(|entry| entry.matches_snap_appname(app_id))
+        })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -189,6 +195,13 @@ impl DesktopEntry {
     pub fn matches_wm_class(&self, id: Ascii<&str>) -> bool {
         self.startup_wm_class()
             .is_some_and(|wm_class| wm_class == id)
+    }
+
+    /// Match snap apps by snap app name.
+    #[inline]
+    pub fn matches_snap_appname(&self, name: Ascii<&str>) -> bool {
+        self.snap_appname()
+            .is_some_and(|snap_name| snap_name == name)
     }
 
     /// Match entry by desktop entry file name
@@ -365,6 +378,11 @@ impl DesktopEntry {
     #[inline]
     pub fn prefers_non_default_gpu(&self) -> bool {
         self.desktop_entry_bool("PrefersNonDefaultGPU")
+    }
+
+    #[inline]
+    pub fn snap_appname(&self) -> Option<&str> {
+        self.desktop_entry("X-SnapAppName")
     }
 
     #[inline]
