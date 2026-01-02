@@ -43,12 +43,6 @@ pub fn find_app_by_id<'a>(
     let match_by_wm_class = entries.iter().find(|entry| entry.matches_wm_class(app_id));
 
     match_by_wm_class
-        // Try first for snap app name
-        .or_else(|| {
-            entries
-                .iter()
-                .find(|entry| entry.matches_snap_appname(app_id))
-        })
         // If no suitable wm class was found, search by entry file name.
         .or_else(|| entries.iter().find(|entry| entry.matches_id(app_id)))
         // Otherwise by name specified in the desktop entry.
@@ -68,6 +62,12 @@ pub fn find_app_by_id<'a>(
                         .is_some_and(|exec| exec == app_id)
                 })
             })
+        })
+        // Match for snap apps
+        .or_else(|| {
+            entries
+                .iter()
+                .find(|entry| entry.matches_snap_appname(app_id))
         })
 }
 
