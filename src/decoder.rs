@@ -161,7 +161,7 @@ impl DesktopEntry {
                     &mut unknown_keys,
                 )?;
             }
-            
+
             if let Some(active_keys) = active_keys.take() {
                 match &mut active_group {
                     Some(active_group) => {
@@ -312,7 +312,11 @@ fn process_line<'a>(
             });
         }
         Line::Entry(key, value) => {
-            let value = format_value(value)?;
+            let value = if key == "Exec" || key == "TryExec" {
+                value.to_string()
+            } else {
+                format_value(value)?
+            };
 
             // if locale
             if key.as_bytes()[key.len() - 1] == b']' {

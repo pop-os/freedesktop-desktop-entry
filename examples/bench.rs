@@ -3,7 +3,7 @@
 
 use std::{fs, time::Duration};
 
-use freedesktop_desktop_entry::{DesktopEntry, Iter, default_paths, get_languages_from_env};
+use freedesktop_desktop_entry::{default_paths, get_languages_from_env, DesktopEntry, Iter};
 
 use std::time::Instant;
 
