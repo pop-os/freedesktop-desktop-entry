@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Value=1.0
+Type=Application
+Name=Dead Cells
+GenericName=Dead Cells
+Comment=Dead Cells
+Icon=/home/abc/GOG\sGames/Dead\sCells/support/icon.png
+Exec=/home/abc/GOG\sGames/Dead\sCells/start.sh ""
+Categories=Game;
+Path=/home/abc/GOG\sGames/Dead\sCells
+
