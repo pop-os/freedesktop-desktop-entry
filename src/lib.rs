@@ -657,6 +657,7 @@ impl PathSource {
         } else if path.starts_with(data_home.as_path()) {
             PathSource::Local
         } else if path.starts_with("/nix/var/nix/profiles/per-user")
+            || path.starts_with("/etc/profiles/per-user")
             || path.to_string_lossy().contains(".nix")
             || path.starts_with(nix_state.as_path())
         {
