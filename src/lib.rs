@@ -626,6 +626,9 @@ pub enum PathSource {
     SystemLocal,
     SystemFlatpak,
     SystemSnap,
+    SessionTemporary,
+    ProcessTemporary,
+    DesktopEntryDaemon,
     Other(String),
 }
 
@@ -662,6 +665,18 @@ impl PathSource {
             || path.starts_with(nix_state.as_path())
         {
             PathSource::LocalNix
+        } else if path
+            .to_string_lossy()
+            .contains("/desktop-entry-daemon/process/")
+        {
+            PathSource::ProcessTemporary
+        } else if path
+            .to_string_lossy()
+            .contains("/desktop-entry-daemon/session/")
+        {
+            PathSource::SessionTemporary
+        } else if path.to_string_lossy().contains("/desktop-entry-daemon/") {
+            PathSource::DesktopEntryDaemon
         } else {
             PathSource::Other(String::from("unknown"))
         }
