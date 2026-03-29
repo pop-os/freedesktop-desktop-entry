@@ -255,7 +255,7 @@ impl DesktopEntry {
     }
 
     /// Insert a new field to this [`DesktopEntry`], in the `[Desktop Entry]` section, removing
-    /// the previous value and locales in any.
+    /// the previous value and locales if any.
     pub fn add_desktop_entry(&mut self, key: String, value: String) {
         let action_key = "Desktop Entry";
         let value = (value, LocaleMap::default());
