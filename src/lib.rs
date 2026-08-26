@@ -650,6 +650,7 @@ impl PathSource {
         } else if path.starts_with("/nix/var/nix/profiles/default")
             || path.starts_with("/nix/store")
             || path.starts_with("/run/current-system/sw")
+            || path.starts_with("/run/system-manager/sw")
         {
             PathSource::Nix
         } else if path.to_string_lossy().contains("/flatpak/") {
