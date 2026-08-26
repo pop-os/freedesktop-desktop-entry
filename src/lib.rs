@@ -688,7 +688,7 @@ pub fn default_paths() -> impl Iterator<Item = PathBuf> {
 #[inline]
 pub(crate) fn dgettext(domain: &str, message: &str) -> String {
     use gettextrs::{setlocale, LocaleCategory};
-    setlocale(LocaleCategory::LcAll, "");
+    unsafe { setlocale(LocaleCategory::LcAll, ""); }
     gettextrs::dgettext(domain, message)
 }
 
