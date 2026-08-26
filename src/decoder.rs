@@ -312,7 +312,7 @@ fn process_line<'a>(
             });
         }
         Line::Entry(key, value) => {
-            let value = if key == "Exec" || key == "TryExec" {
+            let value = if matches!(key, "Exec" | "TryExec") {
                 value.to_string()
             } else {
                 format_value(value)?

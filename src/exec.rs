@@ -225,6 +225,16 @@ mod test {
                 "\"\"".to_string()
             ]
         );
+
+        assert_eq!(
+            de.icon(),
+            Some("/home/abc/GOG Games/Dead Cells/support/icon.png".into())
+        );
+
+        assert_eq!(
+            de.path(),
+            Some("/home/abc/GOG Games/Dead Cells".into())
+        );
     }
     #[test]
     fn should_exec_simple_command() {
