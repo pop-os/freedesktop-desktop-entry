@@ -692,6 +692,22 @@ pub(crate) fn dgettext(domain: &str, message: &str) -> String {
     gettextrs::dgettext(domain, message)
 }
 
+fn normalize_locale(locale: &str) -> String {
+    let (locale, modifier) = match locale.split_once('@') {
+        Some((locale, modifier)) => (locale, Some(modifier)),
+        None => (locale, None),
+    };
+
+    let locale = locale
+        .split_once('.')
+        .map_or(locale, |(locale, _encoding)| locale);
+
+    match modifier {
+        Some(modifier) => format!("{locale}@{modifier}"),
+        None => locale.to_owned(),
+    }
+}
+
 /// Get the configured user language env variables.
 /// See https://wiki.archlinux.org/title/Locale#LANG:_default_locale for more information
 #[cold]
@@ -699,12 +715,12 @@ pub fn get_languages_from_env() -> Vec<String> {
     let mut l = Vec::new();
 
     if let Ok(lang) = std::env::var("LANG") {
-        l.push(lang);
+        l.push(normalize_locale(&lang));
     }
 
     if let Ok(lang) = std::env::var("LANGUAGES") {
         lang.split(':').for_each(|lang| {
-            l.push(lang.to_owned());
+            l.push(normalize_locale(lang));
         })
     }
 
@@ -750,4 +766,16 @@ fn env_with_locale() {
     let locales = &["nb"];
 
     assert_eq!(de.generic_name(locales).unwrap(), "Web Browser");
+}
+
+#[test]
+fn normalize_locale_removes_encoding() {
+    assert_eq!(normalize_locale("pt_BR.UTF-8"), "pt_BR");
+    assert_eq!(normalize_locale("en_US.UTF-8"), "en_US");
+    assert_eq!(normalize_locale("pt_BR"), "pt_BR");
+}
+
+#[test]
+fn normalize_locale_preserves_modifier() {
+    assert_eq!(normalize_locale("sr_RS.UTF-8@latin"), "sr_RS@latin");
 }
