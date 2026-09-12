@@ -626,6 +626,7 @@ pub enum PathSource {
     SystemLocal,
     SystemFlatpak,
     SystemSnap,
+    SystemLinyaps,
     Other(String),
 }
 
@@ -647,6 +648,8 @@ impl PathSource {
             PathSource::SystemFlatpak
         } else if path.starts_with("/var/lib/snapd") {
             PathSource::SystemSnap
+        } else if path.starts_with("/var/lib/linglong") {
+            PathSource::SystemLinyaps
         } else if path.starts_with("/nix/var/nix/profiles/default")
             || path.starts_with("/nix/store")
             || path.starts_with("/run/current-system/sw")
