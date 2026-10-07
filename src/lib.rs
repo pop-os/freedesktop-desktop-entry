@@ -611,7 +611,7 @@ impl IconSource {
 impl Default for IconSource {
     #[inline]
     fn default() -> Self {
-        Self::Name("application-default".to_string())
+        Self::Name("application-x-executable".to_string())
     }
 }
 
