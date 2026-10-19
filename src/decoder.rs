@@ -444,7 +444,10 @@ fn add_generic_locales<L: AsRef<str>>(locales: &[L]) -> Vec<&str> {
 
 #[cfg(test)]
 mod test {
-    use crate::{decoder::Line, parse_line};
+    use crate::{
+        decoder::{format_value, Line},
+        parse_line,
+    };
 
     #[test]
     fn test_parse_empty_comment() {
@@ -484,6 +487,34 @@ mod test {
     #[test]
     fn test_entry_error() {
         let result = parse_line("invalid entry");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_format_value_escapes() {
+        let value = format_value(r"a\sb\nc\td\re\\f").unwrap();
+
+        assert_eq!(value, "a b\nc\td\re\\f");
+    }
+
+    #[test]
+    fn test_format_value_escaped_backslash() {
+        let value = format_value(r#"\\"\\$*\\""#).unwrap();
+
+        assert_eq!(value, r#"\"\$*\""#);
+    }
+
+    #[test]
+    fn test_format_value_invalid_escape() {
+        let result = format_value(r#"\"\""#);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_format_value_trailing_backslash() {
+        let result = format_value(r"abc\");
 
         assert!(result.is_err());
     }
