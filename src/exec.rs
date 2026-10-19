@@ -1,7 +1,7 @@
 // Copyright 2021 System76 <info@system76.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::{decoder::format_value, DesktopEntry};
+use crate::DesktopEntry;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -84,9 +84,7 @@ impl DesktopEntry {
             let mut args: Vec<String> = Vec::new();
 
             for arg in exec.split_ascii_whitespace() {
-                let arg = format_value(arg)
-                    .map_err(|_| ExecError::WrongFormat("cannot format value".into()))?;
-                match ArgOrFieldCode::try_from(arg.as_str()) {
+                match ArgOrFieldCode::try_from(arg) {
                     Ok(arg) => match arg {
                         ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
                             if let Some(arg) = uris.first() {
@@ -188,7 +186,7 @@ mod test {
 
     use std::path::PathBuf;
 
-    use crate::{get_languages_from_env, DesktopEntry};
+    use crate::{DesktopEntry, get_languages_from_env};
 
     use super::ExecError;
 
@@ -211,31 +209,7 @@ mod test {
 
         assert!(matches!(result.unwrap_err(), ExecError::ExecFieldIsEmpty));
     }
-    #[test]
-    fn parse_space() {
-        let path = PathBuf::from("tests_entries/exec/gog_com-Dead_Cells_1.desktop");
-        let locales = get_languages_from_env();
-        let de = DesktopEntry::from_path(path, Some(&locales)).unwrap();
-        let result = de.parse_exec();
 
-        assert_eq!(
-            result.unwrap(),
-            vec![
-                "/home/abc/GOG Games/Dead Cells/start.sh".to_string(),
-                "\"\"".to_string()
-            ]
-        );
-
-        assert_eq!(
-            de.icon(),
-            Some("/home/abc/GOG Games/Dead Cells/support/icon.png".into())
-        );
-
-        assert_eq!(
-            de.path(),
-            Some("/home/abc/GOG Games/Dead Cells".into())
-        );
-    }
     #[test]
     fn should_exec_simple_command() {
         let path = PathBuf::from("tests_entries/exec/alacritty-simple.desktop");

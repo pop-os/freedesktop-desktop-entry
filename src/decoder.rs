@@ -312,11 +312,7 @@ fn process_line<'a>(
             });
         }
         Line::Entry(key, value) => {
-            let value = if matches!(key, "Exec" | "TryExec") {
-                value.to_string()
-            } else {
-                format_value(value)?
-            };
+            let value = format_value(value)?;
 
             // if locale
             if key.as_bytes()[key.len() - 1] == b']' {
