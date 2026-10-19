@@ -73,18 +73,16 @@ impl DesktopEntry {
                 return Err(ExecError::ExecFieldNotFound);
             };
 
-            let exec = if let Some(without_prefix) = exec.strip_prefix('\"') {
-                without_prefix
-                    .strip_suffix('\"')
-                    .ok_or(ExecError::WrongFormat("unmatched quote".into()))?
-            } else {
-                exec
-            };
-
             let mut args: Vec<String> = Vec::new();
 
-            for arg in exec.split_ascii_whitespace() {
-                match ArgOrFieldCode::try_from(arg) {
+            for (arg, quoted) in split_exec(exec)? {
+                // Field codes must not be used inside a quoted argument
+                if quoted {
+                    args.push(arg);
+                    continue;
+                }
+
+                match ArgOrFieldCode::try_from(arg.as_str()) {
                     Ok(arg) => match arg {
                         ArgOrFieldCode::SingleFileName | ArgOrFieldCode::SingleUrl => {
                             if let Some(arg) = uris.first() {
@@ -135,6 +133,68 @@ impl DesktopEntry {
 
         inner(self, exec, uris, &mut locales.iter().map(AsRef::as_ref))
     }
+}
+
+// Splits an Exec value into arguments following the quoting rules described in
+// https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html
+//
+// The general string escapes (\s, \\, ...) must already be undone, which the
+// decoder does for every value. Each argument is returned with a flag telling
+// whether any part of it was quoted.
+fn split_exec(exec: &str) -> Result<Vec<(String, bool)>, ExecError> {
+    let unmatched_quote = || ExecError::WrongFormat("unmatched quote".into());
+
+    let mut args = Vec::new();
+    let mut arg = String::new();
+    let mut in_arg = false;
+    let mut quoted = false;
+    let mut chars = exec.chars();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                in_arg = true;
+                quoted = true;
+
+                loop {
+                    match chars.next().ok_or_else(unmatched_quote)? {
+                        '"' => break,
+                        '\\' => match chars.next().ok_or_else(unmatched_quote)? {
+                            c @ ('"' | '`' | '$' | '\\') => arg.push(c),
+                            c => {
+                                arg.push('\\');
+                                arg.push(c);
+                            }
+                        },
+                        c => arg.push(c),
+                    }
+                }
+            }
+            // not defined by the spec outside of quotes, so behave like GLib and KDE
+            // which follow shell rules and treat it as escaping the next character
+            '\\' => {
+                in_arg = true;
+                arg.push(chars.next().unwrap_or('\\'));
+            }
+            c if c.is_ascii_whitespace() => {
+                if in_arg {
+                    args.push((std::mem::take(&mut arg), quoted));
+                    in_arg = false;
+                    quoted = false;
+                }
+            }
+            c => {
+                in_arg = true;
+                arg.push(c);
+            }
+        }
+    }
+
+    if in_arg {
+        args.push((arg, quoted));
+    }
+
+    Ok(args)
 }
 
 // either a command line argument or a field-code as described
@@ -208,6 +268,48 @@ mod test {
         let result = de.parse_exec_with_uris(&[], &locales);
 
         assert!(matches!(result.unwrap_err(), ExecError::ExecFieldIsEmpty));
+    }
+
+    #[test]
+    fn should_keep_quoted_path_with_spaces() {
+        let path = PathBuf::from("tests_entries/exec/gog_com-Dead_Cells_1.desktop");
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, Some(&locales)).unwrap();
+        let result = de.parse_exec();
+
+        assert_eq!(
+            result.unwrap(),
+            vec![
+                "/home/abc/GOG Games/Dead Cells/start.sh".to_string(),
+                "".to_string()
+            ]
+        );
+
+        assert_eq!(
+            de.icon(),
+            Some("/home/abc/GOG Games/Dead Cells/support/icon.png")
+        );
+
+        assert_eq!(de.path(), Some("/home/abc/GOG Games/Dead Cells"));
+    }
+
+    #[test]
+    fn should_unescape_before_quoting() {
+        let path = PathBuf::from("tests_entries/exec/emacsclient.desktop");
+        let locales = get_languages_from_env();
+        let de = DesktopEntry::from_path(path, Some(&locales)).unwrap();
+        let script = "if [ -n \"$*\" ]; then exec /usr/bin/emacsclient --alternate-editor= --reuse-frame \"$@\"; else exec /usr/bin/emacsclient --alternate-editor= --create-frame; fi";
+
+        assert_eq!(
+            de.parse_exec_with_uris(&[], &locales).unwrap(),
+            vec!["sh", "-c", script, "sh"]
+        );
+
+        assert_eq!(
+            de.parse_exec_with_uris(&["a.txt", "b.txt"], &locales)
+                .unwrap(),
+            vec!["sh", "-c", script, "sh", "a.txt", "b.txt"]
+        );
     }
 
     #[test]
